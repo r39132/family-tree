@@ -315,19 +315,16 @@ This starter is intentionally minimal but complete. Extend as needed.
 
 ## Screenshots
 
-Place screenshots under `frontend/public/screenshots/` and they’ll render below. Filenames are suggestions; adjust as needed.
-
-- Login: `frontend/public/screenshots/login.png`
-- Tree: `frontend/public/screenshots/tree.png`
-- Member Editor: `frontend/public/screenshots/member-editor.png`
-- Invites: `frontend/public/screenshots/invites.png`
-
-Example embeds (will show if files exist):
-
+### Login
 ![Login](frontend/public/screenshots/login.png)
+### Tree
 ![Tree](frontend/public/screenshots/tree.png)
+### Member Editor
 ![Member Editor](frontend/public/screenshots/member-editor.png)
+
+### Invites
 ![Invites](frontend/public/screenshots/invites.png)
+
 
 ## Test Coverage
 
