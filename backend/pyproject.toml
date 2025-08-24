@@ -40,3 +40,26 @@ target-version = ["py312"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --cov=app --cov-report=term-missing --cov-fail-under=60"
+
+[tool.mypy]
+python_version = "3.12"
+pretty = true
+show_error_codes = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+no_implicit_optional = true
+# Start with a lighter policy: type-check bodies even if defs are untyped
+check_untyped_defs = true
+plugins = []
+exclude = "(^|/)tests/"
+
+[[tool.mypy.overrides]]
+module = [
+    "google.*",
+    "google.cloud.*",
+    "google.api_core.*",
+    "jose.*",
+    "python_jose.*",
+]
+ignore_missing_imports = true

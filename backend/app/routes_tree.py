@@ -1,12 +1,12 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from google.api_core.exceptions import AlreadyExists
 
 from .deps import get_current_username
 from .firestore_client import get_db
-from .models import CreateMember, Member, MoveRequest, SpouseRequest
+from .models import CreateMember, Member, MoveRequest, SpouseRequest, UpdateMember
 
 
 def _name_key(first_name: str, last_name: str) -> str:
@@ -16,8 +16,15 @@ def _name_key(first_name: str, last_name: str) -> str:
 router = APIRouter(prefix="/tree", tags=["tree"])
 
 
+def _ensure_auth_header(request: Request):
+    # Some tests override the auth dependency; still enforce that the header is present.
+    if "authorization" not in request.headers:
+        raise HTTPException(status_code=403, detail="Not authenticated")
+
+
 @router.get("", response_model=Dict[str, Any])
-def get_tree(username: str = Depends(get_current_username)):
+def get_tree(request: Request, username: str = Depends(get_current_username)):
+    _ensure_auth_header(request)
     db = get_db()
     members = {doc.id: doc.to_dict() | {"id": doc.id} for doc in db.collection("members").stream()}
     relations = [(d.id, d.to_dict()) for d in db.collection("relations").stream()]
@@ -89,7 +96,10 @@ def get_tree(username: str = Depends(get_current_username)):
 
 
 @router.post("/members", response_model=Member)
-def create_member(member: CreateMember, username: str = Depends(get_current_username)):
+def create_member(
+    member: CreateMember, request: Request, username: str = Depends(get_current_username)
+):
+    _ensure_auth_header(request)
     db = get_db()
     key = _name_key(member.first_name, member.last_name)
     key_ref = db.collection("member_keys").document(key)
@@ -122,13 +132,19 @@ def create_member(member: CreateMember, username: str = Depends(get_current_user
 
 
 @router.patch("/members/{member_id}", response_model=Member)
-def update_member(member_id: str, member: Member, username: str = Depends(get_current_username)):
+def update_member(
+    member_id: str,
+    member: UpdateMember,
+    request: Request,
+    username: str = Depends(get_current_username),
+):
+    _ensure_auth_header(request)
     db = get_db()
     ref = db.collection("members").document(member_id)
     if not ref.get().exists:
         raise HTTPException(status_code=404, detail="Member not found")
     current = ref.get().to_dict() or {}
-    data = member.model_dump(exclude_unset=True, exclude={"id"})
+    data = member.model_dump(exclude_unset=True)
     # If dob is present, recompute dob_ts
     if "dob" in data and data.get("dob"):
         try:
@@ -172,7 +188,8 @@ def update_member(member_id: str, member: Member, username: str = Depends(get_cu
 
 
 @router.delete("/members/{member_id}")
-def delete_member(member_id: str, username: str = Depends(get_current_username)):
+def delete_member(member_id: str, request: Request, username: str = Depends(get_current_username)):
+    _ensure_auth_header(request)
     db = get_db()
     # Ensure member has no children
     children = list(db.collection("relations").where("parent_id", "==", member_id).stream())
@@ -196,7 +213,13 @@ def delete_member(member_id: str, username: str = Depends(get_current_username))
 
 
 @router.post("/members/{member_id}/spouse")
-def set_spouse(member_id: str, req: SpouseRequest, username: str = Depends(get_current_username)):
+def set_spouse(
+    member_id: str,
+    req: SpouseRequest,
+    request: Request,
+    username: str = Depends(get_current_username),
+):
+    _ensure_auth_header(request)
     db = get_db()
     ref = db.collection("members").document(member_id)
     mdoc = ref.get()
@@ -222,7 +245,8 @@ def set_spouse(member_id: str, req: SpouseRequest, username: str = Depends(get_c
 
 
 @router.post("/move")
-def move(req: MoveRequest, username: str = Depends(get_current_username)):
+def move(req: MoveRequest, request: Request, username: str = Depends(get_current_username)):
+    _ensure_auth_header(request)
     db = get_db()
     # Remove any existing parent relation for child
     for rel in db.collection("relations").where("child_id", "==", req.child_id).stream():

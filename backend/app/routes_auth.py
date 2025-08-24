@@ -46,14 +46,15 @@ def send_mail(to_email: str, subject: str, body: str):
 @router.post("/register")
 def register(payload: RegisterRequest):
     db = get_db()
+    # Check username first to return a clearer error independent of invite validity
+    user_ref = db.collection("users").document(payload.username)
+    if user_ref.get().exists:
+        raise HTTPException(status_code=400, detail="Username already exists")
     if settings.require_invite:
         invite_ref = db.collection("invites").document(payload.invite_code)
         inv = invite_ref.get()
         if not inv.exists or not inv.to_dict().get("active", False):
             raise HTTPException(status_code=400, detail="Invalid invite code")
-    user_ref = db.collection("users").document(payload.username)
-    if user_ref.get().exists:
-        raise HTTPException(status_code=400, detail="Username already exists")
     user_ref.set(
         {
             "email": payload.email,

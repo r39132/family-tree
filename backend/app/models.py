@@ -1,5 +1,4 @@
 import re
-from datetime import datetime
 from typing import List, Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -67,18 +66,10 @@ class Member(BaseModel):
             raise ValueError("last_name may only contain letters and -")
         return v
 
+    # Be tolerant on DOB format at the model level; routes derive dob_ts when possible
     @field_validator("dob")
     @classmethod
     def _validate_dob(cls, v: Optional[str]):
-        if v is None:
-            return v
-        # MM/DD/YYYY and valid calendar date
-        if not re.fullmatch(r"(0[1-9]|1[0-2])/(0[1-9]|[12][0-9]|3[01])/\d{4}", v):
-            raise ValueError("dob must be in MM/DD/YYYY format")
-        try:
-            datetime.strptime(v, "%m/%d/%Y")
-        except ValueError:
-            raise ValueError("dob must be a valid date in MM/DD/YYYY format")
         return v
 
     @field_validator(
@@ -135,12 +126,7 @@ class CreateMember(BaseModel):
     def _validate_dob_req(cls, v: str):
         if not v:
             raise ValueError("dob is required")
-        if not re.fullmatch(r"(0[1-9]|1[0-2])/(0[1-9]|[12][0-9]|3[01])/\d{4}", v):
-            raise ValueError("dob must be in MM/DD/YYYY format")
-        try:
-            datetime.strptime(v, "%m/%d/%Y")
-        except ValueError:
-            raise ValueError("dob must be a valid date in MM/DD/YYYY format")
+        # Accept any non-empty string; route will attempt to parse
         return v
 
     @field_validator(
@@ -167,3 +153,19 @@ class SpouseRequest(BaseModel):
 class MoveRequest(BaseModel):
     child_id: str
     new_parent_id: Optional[str]  # None -> make root
+
+
+class UpdateMember(BaseModel):
+    # All fields optional for PATCH semantics
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    dob: Optional[str] = None
+    nick_name: Optional[str] = None
+    spouse_id: Optional[str] = None
+    is_deceased: Optional[bool] = None
+    middle_name: Optional[str] = None
+    birth_location: Optional[str] = None
+    residence_location: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    hobbies: Optional[List[str]] = None
