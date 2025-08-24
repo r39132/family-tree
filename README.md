@@ -1,4 +1,4 @@
-# Family Tree
+# 🌳 Family Tree – Starter Repo
 
 ![Python](https://img.shields.io/badge/Python-3.12-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.112%2B-009485)
@@ -108,7 +108,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-  B[Browser] -->|/login, /register, /tree, etc.| FE[Next.js (pages router)]
+  B[Browser] -->|/login, /register, /tree, etc.| FE[Next.js pages router]
   FE -->|HTTP JSON + JWT| BE[FastAPI]
   BE -->|Firestore SDK| FS[Firestore]
   BE -->|SMTP| MT[Mail Server]
@@ -276,10 +276,10 @@ sequenceDiagram
   participant BE as FastAPI
   participant DB as Firestore
   U->>FE: Select spouse
-  FE->>BE: POST /tree/members/{id}/spouse { spouse_id|null }
+  FE->>BE: POST /tree/members/{id}/spouse
   BE->>DB: members.update(spouse_id on both)
   BE-->>FE: { ok }
-  FE-->>U: Couple node rendered; children merged
+  FE-->>U: Couple node rendered
 ```
 
 ### Logout
