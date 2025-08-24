@@ -10,6 +10,8 @@ export default function Register(){
   const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
   const [confirm,setConfirm]=useState('');
+  const [showPass, setShowPass] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error,setError]=useState<string|null>(null);
   const router = useRouter();
 
@@ -61,8 +63,78 @@ export default function Register(){
           <input className="input" placeholder="Invite Code" value={invite_code} onChange={e=>setInvite(e.target.value)}/>
           <input className="input" placeholder="Username" value={username} onChange={e=>setUsername(e.target.value)}/>
           <input className="input" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)}/>
-          <input className="input" type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)}/>
-          <input className="input" type="password" placeholder="Confirm Password" value={confirm} onChange={e=>setConfirm(e.target.value)}/>
+          <div className="input-wrap">
+            <input
+              id="reg-password"
+              className="input"
+              type={showPass ? 'text' : 'password'}
+              placeholder="Password"
+              value={password}
+              onChange={e=>setPassword(e.target.value)}
+            />
+            <button
+              type="button"
+              className="toggle-pass"
+              aria-label={showPass ? 'Hide password' : 'Show password'}
+              aria-pressed={showPass}
+              aria-controls="reg-password"
+              title={showPass ? 'Hide password' : 'Show password'}
+              onClick={()=>setShowPass(v=>!v)}
+            >
+              {showPass ? (
+                // Eye off icon
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-5 0-9.27-3.11-11-8 1.02-2.94 3.07-5.29 5.65-6.71" />
+                  <path d="M1 1l22 22" />
+                  <path d="M9.88 9.88A3 3 0 0 0 12 15a3 3 0 0 0 2.12-.88" />
+                  <path d="M14.12 14.12L9.88 9.88" />
+                  <path d="M10.73 5.08A10.94 10.94 0 0 1 12 4c5 0 9.27 3.11 11 8-.54 1.56-1.4 2.96-2.5 4.12" />
+                </svg>
+              ) : (
+                // Eye icon
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+            </button>
+          </div>
+          <div className="input-wrap">
+            <input
+              id="reg-confirm"
+              className="input"
+              type={showConfirm ? 'text' : 'password'}
+              placeholder="Confirm Password"
+              value={confirm}
+              onChange={e=>setConfirm(e.target.value)}
+            />
+            <button
+              type="button"
+              className="toggle-pass"
+              aria-label={showConfirm ? 'Hide password' : 'Show password'}
+              aria-pressed={showConfirm}
+              aria-controls="reg-confirm"
+              title={showConfirm ? 'Hide password' : 'Show password'}
+              onClick={()=>setShowConfirm(v=>!v)}
+            >
+              {showConfirm ? (
+                // Eye off icon
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-5 0-9.27-3.11-11-8 1.02-2.94 3.07-5.29 5.65-6.71" />
+                  <path d="M1 1l22 22" />
+                  <path d="M9.88 9.88A3 3 0 0 0 12 15a3 3 0 0 0 2.12-.88" />
+                  <path d="M14.12 14.12L9.88 9.88" />
+                  <path d="M10.73 5.08A10.94 10.94 0 0 1 12 4c5 0 9.27 3.11 11 8-.54 1.56-1.4 2.96-2.5 4.12" />
+                </svg>
+              ) : (
+                // Eye icon
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+            </button>
+          </div>
           <div className="bottombar">
             <div className="bottombar-left">
               <Link href="/login">Back to login</Link>

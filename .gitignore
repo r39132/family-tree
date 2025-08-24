@@ -28,3 +28,4 @@ frontend/yarn-error.log*
 
 # Local assets
 /screenshots/
+/scripts/
