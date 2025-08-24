@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { api } from '../lib/api';
+import SimpleTopNav from '../components/SimpleTopNav';
 
 export default function Forgot(){
   const [username,setUsername]=useState('');
@@ -19,9 +20,11 @@ export default function Forgot(){
   }
 
   return (
-    <div className="container">
-      <div className="card">
-        <h1>Password recovery</h1>
+    <>
+      <div className="container">
+        <SimpleTopNav />
+        <div className="card">
+          <h1>Password recovery</h1>
   {ok ? <p>Check your email for a reset link (in development with USE_EMAIL_IN_DEV=true, check the backend logs).</p> : (
           <form onSubmit={submit}>
             {error && <p style={{color:'crimson'}}>{error}</p>}
@@ -39,5 +42,6 @@ export default function Forgot(){
         )}
       </div>
     </div>
+    </>
   );
 }

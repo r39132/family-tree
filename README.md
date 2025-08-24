@@ -7,7 +7,7 @@
 ![Ruff](https://img.shields.io/badge/Lint-ruff-46a7f8)
 ![Black](https://img.shields.io/badge/Format-black-000000)
 ![pytest](https://img.shields.io/badge/tests-pytest-0A9EDC)
-![Coverage](https://img.shields.io/badge/coverage-62%25-yellowgreen)
+![Coverage](https://img.shields.io/badge/coverage-69%25-brightgreen)
 <!-- If you adopt GitHub Actions, replace repo and workflow names below -->
 ![CI](https://img.shields.io/badge/CI-GitHub%20Actions-lightgrey)
 
@@ -331,11 +331,14 @@ This starter is intentionally minimal but complete. Extend as needed.
 Recent run (pytest + coverage):
 
 ```
-TOTAL 594 statements, 62% coverage
+TOTAL 594 statements, 69% coverage
 
 Notable modules:
-- app/routes_tree.py ~78%
-- app/routes_auth.py ~61%
+- app/routes_tree.py ~79%
+- app/routes_auth.py ~87%
+- app/auth_utils.py 100%
+- app/config.py 100%
+- app/models.py ~85%
 ```
 
 Run locally:

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '../lib/api';
 import { useRouter } from 'next/router';
+import SimpleTopNav from '../components/SimpleTopNav';
 
 export default function Reset(){
   const router = useRouter();
@@ -32,10 +33,12 @@ export default function Reset(){
   }
 
   return (
-    <div className="container">
-      <div className="card">
-        <h1>Reset password</h1>
-        {ok ? <p>Password updated. Redirecting to login…</p> : (
+    <>
+      <div className="container">
+        <SimpleTopNav />
+        <div className="card">
+          <h1>Reset password</h1>
+          {ok ? <p>Password updated. Redirecting to login…</p> : (
           <form onSubmit={submit}>
             {error && <p style={{color:'crimson'}}>{error}</p>}
             <input className="input" placeholder="Username" value={username} onChange={e=>setUsername(e.target.value)}/>
@@ -53,5 +56,6 @@ export default function Reset(){
         )}
       </div>
     </div>
+    </>
   );
 }

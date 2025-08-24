@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { api } from '../lib/api';
 import { useRouter } from 'next/router';
+import SimpleTopNav from '../components/SimpleTopNav';
 
 export default function Login(){
   const [username,setUsername]=useState('');
@@ -11,24 +12,57 @@ export default function Login(){
   const [error,setError]=useState<string|null>(null);
   const router = useRouter();
 
+  // Check if form is valid (all required fields filled)
+  const isFormValid = username.trim() !== '' && password.trim() !== '';
+
+  function getErrorMessage(errorText: string): string {
+    // Convert generic error messages to user-friendly ones
+    if (errorText.includes('Failed to fetch') || errorText.includes('fetch')) {
+      return 'Unable to connect to the server. Please check your internet connection and try again.';
+    }
+    if (errorText.includes('Invalid credentials') || errorText.includes('401')) {
+      return 'Invalid username or password. Please check your credentials and try again.';
+    }
+    if (errorText.includes('400')) {
+      return 'Please check your username and password format.';
+    }
+    if (errorText.includes('500')) {
+      return 'Server error. Please try again later or contact support.';
+    }
+    // Return the original message if no specific pattern matches
+    return errorText;
+  }
+
   async function submit(e:any){
     e.preventDefault();
+    
+    // Clear any previous errors
+    setError(null);
+    
+    // Validate form before submission
+    if (!isFormValid) {
+      setError('Please fill in both username and password.');
+      return;
+    }
+
     try{
       const res = await api('/auth/login',{method:'POST', body:JSON.stringify({username,password})});
       localStorage.setItem('token', res.access_token);
       if(remember) localStorage.setItem('remember','1'); else localStorage.removeItem('remember');
   router.push('/');
     }catch(err:any){
-      setError(err.message);
+      setError(getErrorMessage(err.message || 'An unexpected error occurred'));
     }
   }
 
   return (
-    <div className="container">
-      <div className="card">
-        <h1>Login</h1>
-        {error && <p style={{color:'crimson'}}>{error}</p>}
-        <form onSubmit={submit}>
+    <>
+      <div className="container">
+        <SimpleTopNav />
+        <div className="card">
+          <h1>Login</h1>
+          {error && <p style={{color:'crimson'}}>{error}</p>}
+          <form onSubmit={submit}>
             <label htmlFor="username">Username</label>
             <input id="username" className="input" placeholder="Username" value={username} onChange={e=>setUsername(e.target.value)}/>
             <label htmlFor="password">Password</label>
@@ -73,11 +107,19 @@ export default function Login(){
               <Link href="/register">Register</Link>
             </div>
             <div className="bottombar-right">
-              <button className="btn" type="submit">Login</button>
+              <button 
+                className={`btn ${!isFormValid ? 'disabled' : ''}`} 
+                type="submit" 
+                disabled={!isFormValid}
+                title={!isFormValid ? 'Please fill in all fields' : 'Login to your account'}
+              >
+                Login
+              </button>
             </div>
           </div>
         </form>
       </div>
     </div>
+    </>
   );
 }

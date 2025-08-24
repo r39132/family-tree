@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '../lib/api';
 import { useRouter } from 'next/router';
+import SimpleTopNav from '../components/SimpleTopNav';
 
 export default function Register(){
   const [invite_code,setInvite]=useState('');
@@ -50,11 +51,13 @@ export default function Register(){
   }
 
   return (
-    <div className="container">
-      <div className="card">
-        <h1>Register</h1>
-        {error && <p style={{color:'crimson'}}>{error}</p>}
-        <form onSubmit={submit}>
+    <>
+      <div className="container">
+        <SimpleTopNav />
+        <div className="card">
+          <h1>Register</h1>
+          {error && <p style={{color:'crimson'}}>{error}</p>}
+          <form onSubmit={submit}>
           <input className="input" placeholder="Invite Code" value={invite_code} onChange={e=>setInvite(e.target.value)}/>
           <input className="input" placeholder="Username" value={username} onChange={e=>setUsername(e.target.value)}/>
           <input className="input" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)}/>
@@ -71,5 +74,6 @@ export default function Register(){
         </form>
       </div>
     </div>
+    </>
   );
 }
