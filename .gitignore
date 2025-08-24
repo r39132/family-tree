@@ -27,4 +27,4 @@ frontend/yarn-error.log*
 *.swo
 
 # Local assets
-screenshots/
+/screenshots/
