@@ -1,4 +1,4 @@
-# 🌳 Family Tree – Starter Repo
+# 🌳 Family Tree
 
 ![Python](https://img.shields.io/badge/Python-3.12-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.112%2B-009485)
@@ -11,7 +11,7 @@
 <!-- If you adopt GitHub Actions, replace repo and workflow names below -->
 ![CI](https://img.shields.io/badge/CI-GitHub%20Actions-lightgrey)
 
-A full‑stack starter for a **Family Tree** website you can run locally or deploy on **Google Cloud**.
+A full‑stack repo for a **Family Tree** website you can run locally or deploy on **Google Cloud**.
 
 - **Frontend:** Next.js (TypeScript), nature‑themed UI, pages for Login, Register (with invite code), Forgot Password, Reset Password, Tree view with CRUD and move
 - **Backend:** FastAPI (Python 3.12.3), Firestore (named DB supported), JWT auth, email reset flow (SMTP or console)
