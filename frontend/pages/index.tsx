@@ -5,6 +5,7 @@ import MemberEditor from '../components/MemberEditor';
 import TopNav from '../components/TopNav';
 import { useRouter } from 'next/router';
 import Modal from '../components/Modal';
+import SearchableSelect from '../components/SearchableSelect';
 
 export default function Home(){
   const [tree,setTree]=useState<any>({roots:[],members:[]});
@@ -131,28 +132,35 @@ export default function Home(){
       <div className="card">
         <h2>Move Member</h2>
         <div className="grid2">
-          <select value={moveChild} onChange={e=>setMoveChild(e.target.value)}>
-            <option value="">Select child</option>
-            {tree.members?.slice().sort((a:any,b:any)=>{
+          <SearchableSelect
+            options={(tree.members||[]).slice().sort((a:any,b:any)=>{
               const fa = (a.first_name||'').toLowerCase();
               const fb = (b.first_name||'').toLowerCase();
-              if(fa<fb) return -1; if(fa>fb) return 1;
+              if (fa<fb) return -1; if (fa>fb) return 1;
               const la = (a.last_name||'').toLowerCase();
               const lb = (b.last_name||'').toLowerCase();
-              if(la<lb) return -1; if(la>lb) return 1; return 0;
-            }).map((m:any)=>(<option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>))}
-          </select>
-          <select value={moveParent||''} onChange={e=>setMoveParent(e.target.value || undefined)}>
-            <option value="">(Make root)</option>
-            {tree.members?.slice().sort((a:any,b:any)=>{
+              if (la<lb) return -1; if (la>lb) return 1; return 0;
+            }).map((m:any)=>({ value: m.id, label: `${m.first_name} ${m.last_name}` }))}
+            value={moveChild}
+            onChange={setMoveChild}
+            placeholder="Select child"
+            ariaLabel="Select child"
+          />
+          <SearchableSelect
+            options={(tree.members||[]).slice().sort((a:any,b:any)=>{
               const fa = (a.first_name||'').toLowerCase();
               const fb = (b.first_name||'').toLowerCase();
-              if(fa<fb) return -1; if(fa>fb) return 1;
+              if (fa<fb) return -1; if (fa>fb) return 1;
               const la = (a.last_name||'').toLowerCase();
               const lb = (b.last_name||'').toLowerCase();
-              if(la<lb) return -1; if(la>lb) return 1; return 0;
-            }).map((m:any)=>(<option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>))}
-          </select>
+              if (la<lb) return -1; if (la>lb) return 1; return 0;
+            }).map((m:any)=>({ value: m.id, label: `${m.first_name} ${m.last_name}` }))}
+            value={moveParent || ''}
+            onChange={(v)=>setMoveParent(v || undefined)}
+            placeholder="Select parent (or make root)"
+            ariaLabel="Select new parent"
+            emptyOption={{ value: '', label: '(Make root)' }}
+          />
         </div>
         <div className="bottombar">
           <div className="bottombar-left"></div>

@@ -9,6 +9,9 @@ on:
 jobs:
   backend-ci:
     runs-on: ubuntu-latest
+    env:
+      GOOGLE_CLOUD_PROJECT: family-tree-ci
+      JWT_SECRET: test-secret
     defaults:
       run:
         working-directory: backend
