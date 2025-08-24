@@ -1,0 +1,41 @@
+[project]
+name = "family-tree-api"
+version = "0.1.0"
+description = "FastAPI backend for Family Tree"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.112",
+    "uvicorn>=0.30",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.2.1",
+    "google-cloud-firestore>=2.16.0",
+    "email-validator>=2.1.0.post1",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest",
+    "pytest-cov",
+    "httpx",
+    "ruff",
+    "black",
+    "pre-commit",
+    "mypy",
+    "types-passlib",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-select = ["I"]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --cov=app --cov-report=term-missing"
+

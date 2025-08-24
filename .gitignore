@@ -1,0 +1,30 @@
+.DS_Store
+
+# Backend (Python)
+backend/.venv/
+backend/__pycache__/
+backend/.pytest_cache/
+backend/.coverage
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/.env
+
+# Frontend (Node/Next.js)
+frontend/node_modules/
+frontend/.next/
+frontend/.turbo/
+frontend/.vercel/
+frontend/.env*
+!frontend/.env*.example
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# Editors/OS
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local assets
+screenshots/
