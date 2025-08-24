@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from .config import settings
 from .routes_auth import router as auth_router
 from .routes_tree import router as tree_router
@@ -16,6 +17,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(tree_router)
+
 
 @app.get("/healthz")
 def health():

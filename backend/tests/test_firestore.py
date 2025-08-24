@@ -7,4 +7,4 @@ def test_firestore_client():
     # Should return some kind of client object
     assert db is not None
     # Should have collection method
-    assert hasattr(db, 'collection')
+    assert hasattr(db, "collection")

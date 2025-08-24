@@ -31,7 +31,7 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
     return errs;
   }
 
-  useEffect(()=>{ 
+  useEffect(()=>{
     const base = validate(m);
     // Merge in externalErrors, but for email drop server error once client validation passes
     const merged: Record<string,string> = { ...base };

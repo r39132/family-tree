@@ -1,7 +1,9 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, List
 import re
 from datetime import datetime
+from typing import List, Optional
+
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
 
 class RegisterRequest(BaseModel):
     invite_code: str
@@ -9,13 +11,16 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
 
+
 class LoginRequest(BaseModel):
     username: str
     password: str
 
+
 class ForgotRequest(BaseModel):
     username: str
     email: EmailStr
+
 
 class ResetRequest(BaseModel):
     username: str
@@ -23,9 +28,11 @@ class ResetRequest(BaseModel):
     confirm_password: str
     token: str
 
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
 
 class Member(BaseModel):
     id: Optional[str] = None
@@ -74,13 +81,22 @@ class Member(BaseModel):
             raise ValueError("dob must be a valid date in MM/DD/YYYY format")
         return v
 
-    @field_validator("email", "nick_name", "middle_name", "birth_location", "residence_location", "phone", mode="before")
+    @field_validator(
+        "email",
+        "nick_name",
+        "middle_name",
+        "birth_location",
+        "residence_location",
+        "phone",
+        mode="before",
+    )
     @classmethod
     def _empty_to_none(cls, v):
         # Convert empty strings to None so optional fields don't fail validation
         if isinstance(v, str) and v.strip() == "":
             return None
         return v
+
 
 class CreateMember(BaseModel):
     first_name: str
@@ -127,7 +143,15 @@ class CreateMember(BaseModel):
             raise ValueError("dob must be a valid date in MM/DD/YYYY format")
         return v
 
-    @field_validator("email", "nick_name", "middle_name", "birth_location", "residence_location", "phone", mode="before")
+    @field_validator(
+        "email",
+        "nick_name",
+        "middle_name",
+        "birth_location",
+        "residence_location",
+        "phone",
+        mode="before",
+    )
     @classmethod
     def _empty_to_none_req(cls, v):
         # Convert empty strings to None so optional fields don't fail validation
@@ -135,8 +159,10 @@ class CreateMember(BaseModel):
             return None
         return v
 
+
 class SpouseRequest(BaseModel):
     spouse_id: Optional[str] = None
+
 
 class MoveRequest(BaseModel):
     child_id: str

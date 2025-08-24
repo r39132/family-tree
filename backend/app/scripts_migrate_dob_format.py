@@ -2,8 +2,11 @@
 One-off migration: convert member.dob from DD/MM/YYYY to MM/DD/YYYY where applicable.
 Run with: uv run python -m app.scripts_migrate_dob_format
 """
-from app.firestore_client import get_db
+
 from datetime import datetime
+
+from app.firestore_client import get_db
+
 
 def is_ddmmyyyy(s: str) -> bool:
     try:
@@ -12,9 +15,11 @@ def is_ddmmyyyy(s: str) -> bool:
     except Exception:
         return False
 
+
 def to_mmddyyyy(s: str) -> str:
     dt = datetime.strptime(s, "%d/%m/%Y")
     return dt.strftime("%m/%d/%Y")
+
 
 def main():
     db = get_db()
@@ -34,6 +39,7 @@ def main():
     if count % 400:
         batch.commit()
     print(f"Updated {count} documents.")
+
 
 if __name__ == "__main__":
     main()

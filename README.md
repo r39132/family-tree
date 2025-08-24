@@ -1,6 +1,6 @@
 # 🌳 Family Tree
 
-![Python](https://img.shields.io/badge/Python-3.12-blue)
+![Python](https://img.shields.io/badge/Python-3.12.3-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.112%2B-009485)
 ![Next.js](https://img.shields.io/badge/Next.js-14-black)
 ![Node](https://img.shields.io/badge/Node-20.x-339933)
@@ -9,7 +9,7 @@
 ![pytest](https://img.shields.io/badge/tests-pytest-0A9EDC)
 ![Coverage](https://img.shields.io/badge/coverage-69%25-brightgreen)
 <!-- If you adopt GitHub Actions, replace repo and workflow names below -->
-![CI](https://img.shields.io/badge/CI-GitHub%20Actions-lightgrey)
+[![CI-CD](https://github.com/r39132/family-tree/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/r39132/family-tree/actions/workflows/ci-cd.yml)
 
 A full‑stack repo for a **Family Tree** website you can run locally or deploy on **Google Cloud**.
 
@@ -22,8 +22,8 @@ A full‑stack repo for a **Family Tree** website you can run locally or deploy 
 
 ### Prereqs
 - Node 18+ and npm
-- Python 3.12.3
-- `uv` (https://docs.astral.sh/uv/)
+- Python 3.12.3 (project pinned via `.python-version`)
+- `uv` package manager (https://docs.astral.sh/uv/)
 - `gcloud` SDK (if deploying or testing Firestore access locally with ADC/SA)
 - Firestore database already created (named or (default))
 
@@ -38,12 +38,61 @@ export GOOGLE_CLOUD_PROJECT=your-project-id
 export FIRESTORE_DATABASE=family-tree   # your DB id; omit or set to (default) if using the default
 ```
 
+### Python env setup (uv venv)
+
+This project uses uv-managed virtual environments. To create/sync the backend env:
+
+```bash
+cd backend
+uv venv --python 3.12.3   # create a .venv with Python 3.12.3
+uv sync                   # install project deps into .venv
+```
+
+Activate the venv (macOS bash):
+
+```bash
+source .venv/bin/activate
+```
+
+You can also run commands without activating by prefixing with `uv run`:
+
+```bash
+uv run python -V
+uv run pytest
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+```
+
+To upgrade/switch Python, update `.python-version` (root and backend) and recreate the venv:
+
+```bash
+rm -rf backend/.venv
+uv venv --python 3.12.3
+uv sync
+```
+
+### Git hooks (pre-commit / pre-push)
+
+This repo uses pre-commit for formatting/linting and a pre-push test check:
+
+- pre-commit: ruff (with --fix), ruff-format, black, end-of-file-fixer, trailing-whitespace
+- pre-push: run backend pytest via uv
+
+Install and activate hooks:
+
+```bash
+cd backend
+uv run pre-commit install            # install pre-commit (pre-commit hooks)
+uv run pre-commit install --hook-type pre-push  # also install pre-push
+
+# optional: run on all files once
+uv run pre-commit run --all-files
+```
+
 ### Run locally
 
 ```bash
 # Backend
 cd backend
-uv sync
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
 
 # Frontend (in another terminal)

@@ -1,10 +1,11 @@
 from fastapi.testclient import TestClient
-from app.main import app
-from app.firestore_client import get_db as real_get_db
-from app.deps import get_current_username
-from tests.test_tree_endpoints import fake_db
-import app.routes_tree as routes_tree
+
 import app.routes_auth as routes_auth
+import app.routes_tree as routes_tree
+from app.deps import get_current_username
+from app.firestore_client import get_db as real_get_db
+from app.main import app
+from tests.test_tree_endpoints import fake_db
 
 
 def setup_module(module):
@@ -33,13 +34,15 @@ def teardown_module(module):
 def setup_function(function):
     # Reset fake DB state before each test to prevent cross-test interference
     fake_db._store.clear()
-    fake_db._store.update({
-        "members": {},
-        "relations": {},
-        "member_keys": {},
-        "invites": {},
-        "users": {},
-    })
+    fake_db._store.update(
+        {
+            "members": {},
+            "relations": {},
+            "member_keys": {},
+            "invites": {},
+            "users": {},
+        }
+    )
 
 
 def test_health_endpoint():
@@ -60,20 +63,20 @@ def test_tree_endpoint_no_auth():
 def test_member_create_no_auth():
     """Test member creation without authentication"""
     client = TestClient(app)
-    r = client.post("/tree/members", json={
-        "first_name": "Test",
-        "last_name": "User",
-        "dob": "01/01/2000"
-    })
+    r = client.post(
+        "/tree/members", json={"first_name": "Test", "last_name": "User", "dob": "01/01/2000"}
+    )
     assert r.status_code == 403
 
 
 def test_member_update_not_found():
     """Test updating non-existent member"""
     client = TestClient(app)
-    r = client.patch("/tree/members/nonexistent", json={
-        "first_name": "Updated"
-    }, headers={"Authorization": "Bearer x"})
+    r = client.patch(
+        "/tree/members/nonexistent",
+        json={"first_name": "Updated"},
+        headers={"Authorization": "Bearer x"},
+    )
     assert r.status_code == 404
     assert "Member not found" in r.json()["detail"]
 
@@ -81,9 +84,11 @@ def test_member_update_not_found():
 def test_member_set_spouse_not_found():
     """Test setting spouse for non-existent member"""
     client = TestClient(app)
-    r = client.post("/tree/members/nonexistent/spouse", json={
-        "spouse_id": "someone"
-    }, headers={"Authorization": "Bearer x"})
+    r = client.post(
+        "/tree/members/nonexistent/spouse",
+        json={"spouse_id": "someone"},
+        headers={"Authorization": "Bearer x"},
+    )
     assert r.status_code == 404
     assert "Member not found" in r.json()["detail"]
 
@@ -92,16 +97,18 @@ def test_member_set_spouse_unlink():
     """Test unlinking spouse"""
     client = TestClient(app)
     # Create member first
-    member = client.post("/tree/members", json={
-        "first_name": "Test",
-        "last_name": "User", 
-        "dob": "01/01/2000"
-    }, headers={"Authorization": "Bearer x"}).json()
-    
+    member = client.post(
+        "/tree/members",
+        json={"first_name": "Test", "last_name": "User", "dob": "01/01/2000"},
+        headers={"Authorization": "Bearer x"},
+    ).json()
+
     # Set spouse to None (unlink)
-    r = client.post(f"/tree/members/{member['id']}/spouse", json={
-        "spouse_id": None
-    }, headers={"Authorization": "Bearer x"})
+    r = client.post(
+        f"/tree/members/{member['id']}/spouse",
+        json={"spouse_id": None},
+        headers={"Authorization": "Bearer x"},
+    )
     assert r.status_code == 200
     assert r.json()["ok"] is True
 
@@ -119,11 +126,11 @@ def test_tree_empty():
 def test_member_invalid_dob_format():
     """Test member creation with invalid DOB format - should still succeed"""
     client = TestClient(app)
-    r = client.post("/tree/members", json={
-        "first_name": "Test",
-        "last_name": "User",
-        "dob": "invalid-date"
-    }, headers={"Authorization": "Bearer x"})
+    r = client.post(
+        "/tree/members",
+        json={"first_name": "Test", "last_name": "User", "dob": "invalid-date"},
+        headers={"Authorization": "Bearer x"},
+    )
     # Should succeed but without dob_ts field
     assert r.status_code == 200
 
@@ -131,9 +138,9 @@ def test_member_invalid_dob_format():
 def test_cors_headers():
     """Test CORS headers are present"""
     client = TestClient(app)
-    r = client.options("/healthz", headers={
-        "Origin": "http://localhost:3000",
-        "Access-Control-Request-Method": "GET"
-    })
+    r = client.options(
+        "/healthz",
+        headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "GET"},
+    )
     # Should have CORS headers
     assert "access-control-allow-origin" in r.headers or r.status_code == 200

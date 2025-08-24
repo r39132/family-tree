@@ -1,5 +1,6 @@
-from pydantic_settings import BaseSettings
 from pydantic import Field
+from pydantic_settings import BaseSettings
+
 
 class Settings(BaseSettings):
     app_name: str = Field(default="Family Tree API", alias="APP_NAME")
@@ -26,5 +27,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         extra = "ignore"
+
 
 settings = Settings()

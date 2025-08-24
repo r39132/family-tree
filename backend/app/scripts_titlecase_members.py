@@ -12,8 +12,10 @@ FIELDS = [
     # hobbies handled separately
 ]
 
+
 def to_title(s: str) -> str:
     return " ".join(w.capitalize() for w in (s or "").split())
+
 
 def main():
     db = get_db()
@@ -36,6 +38,7 @@ def main():
             doc.reference.update(updates)
             count += 1
     print(f"Updated {count} members with title-cased fields")
+
 
 if __name__ == "__main__":
     main()

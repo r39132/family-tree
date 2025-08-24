@@ -35,10 +35,10 @@ export default function Login(){
 
   async function submit(e:any){
     e.preventDefault();
-    
+
     // Clear any previous errors
     setError(null);
-    
+
     // Validate form before submission
     if (!isFormValid) {
       setError('Please fill in both username and password.');
@@ -107,9 +107,9 @@ export default function Login(){
               <Link href="/register">Register</Link>
             </div>
             <div className="bottombar-right">
-              <button 
-                className={`btn ${!isFormValid ? 'disabled' : ''}`} 
-                type="submit" 
+              <button
+                className={`btn ${!isFormValid ? 'disabled' : ''}`}
+                type="submit"
                 disabled={!isFormValid}
                 title={!isFormValid ? 'Please fill in all fields' : 'Login to your account'}
               >

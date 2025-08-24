@@ -2,8 +2,11 @@
 Backfill dob_ts (Firestore timestamp) from dob string (MM/DD/YYYY) for existing member docs.
 Run with: uv run python -m app.scripts_backfill_dob_ts
 """
-from app.firestore_client import get_db
+
 from datetime import datetime, timezone
+
+from app.firestore_client import get_db
+
 
 def is_mmddyyyy(s: str) -> bool:
     try:
@@ -11,6 +14,7 @@ def is_mmddyyyy(s: str) -> bool:
         return True
     except Exception:
         return False
+
 
 def main():
     db = get_db()
@@ -31,6 +35,7 @@ def main():
     if count % 400:
         batch.commit()
     print(f"Backfilled dob_ts for {count} members.")
+
 
 if __name__ == "__main__":
     main()

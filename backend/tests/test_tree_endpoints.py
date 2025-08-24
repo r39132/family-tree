@@ -1,12 +1,14 @@
+import itertools
+
 from fastapi.testclient import TestClient
-from app.main import app
-from app.firestore_client import get_db as real_get_db
-from app.deps import get_current_username
 from google.api_core.exceptions import AlreadyExists
 from google.cloud import firestore
-import itertools
-import app.routes_tree as routes_tree
+
 import app.routes_auth as routes_auth
+import app.routes_tree as routes_tree
+from app.deps import get_current_username
+from app.firestore_client import get_db as real_get_db
+from app.main import app
 
 
 class FakeDoc:
@@ -17,17 +19,21 @@ class FakeDoc:
 
     # For reads
     def get(self):
-        data = self._store[self._col].get(self.id)
+        # Return a lightweight record similar to Firestore
+
         class R:
             def __init__(self, exists, data, id):
                 self._exists = exists
                 self._data = data
                 self.id = id
+
             @property
             def exists(self):
                 return self._exists
+
             def to_dict(self):
                 return dict(self._data) if self._data else {}
+
         return R(self.id in self._store[self._col], self._store[self._col].get(self.id), self.id)
 
     # Firestore doc operations
@@ -37,6 +43,7 @@ class FakeDoc:
             if v is firestore.SERVER_TIMESTAMP:
                 return "now"
             return v
+
         return {k: norm_val(v) for k, v in dict(data).items()}
 
     def set(self, data):
@@ -118,6 +125,7 @@ class FakeDB:
 
 fake_db = FakeDB()
 
+
 def setup_module(module):
     # Override auth and db for all tests in this module
     module._orig_db = app.dependency_overrides.get(real_get_db)
@@ -134,13 +142,15 @@ def setup_module(module):
 def setup_function(function):
     # Reset fake DB state before each test to prevent cross-test interference
     fake_db._store.clear()
-    fake_db._store.update({
-        "members": {},
-        "relations": {},
-        "member_keys": {},
-        "invites": {},
-        "users": {},
-    })
+    fake_db._store.update(
+        {
+            "members": {},
+            "relations": {},
+            "member_keys": {},
+            "invites": {},
+            "users": {},
+        }
+    )
 
 
 def teardown_module(module):
@@ -174,12 +184,31 @@ def test_create_member_and_conflict():
 def test_spouse_linking_and_tree_roots_and_children_merge():
     client = TestClient(app)
     # create parents
-    mom = client.post("/tree/members", json={"first_name": "Mary", "last_name": "Lee", "dob": "02/03/1970"}, headers={"Authorization": "Bearer x"}).json()
-    dad = client.post("/tree/members", json={"first_name": "John", "last_name": "Lee", "dob": "03/04/1968"}, headers={"Authorization": "Bearer x"}).json()
+    mom = client.post(
+        "/tree/members",
+        json={"first_name": "Mary", "last_name": "Lee", "dob": "02/03/1970"},
+        headers={"Authorization": "Bearer x"},
+    ).json()
+    dad = client.post(
+        "/tree/members",
+        json={"first_name": "John", "last_name": "Lee", "dob": "03/04/1968"},
+        headers={"Authorization": "Bearer x"},
+    ).json()
     # link spouses
-    assert client.post(f"/tree/members/{mom['id']}/spouse", json={"spouse_id": dad["id"]}, headers={"Authorization": "Bearer x"}).status_code == 200
+    assert (
+        client.post(
+            f"/tree/members/{mom['id']}/spouse",
+            json={"spouse_id": dad["id"]},
+            headers={"Authorization": "Bearer x"},
+        ).status_code
+        == 200
+    )
     # create child and relate under one parent
-    kid = client.post("/tree/members", json={"first_name": "Sam", "last_name": "Lee", "dob": "05/06/2005"}, headers={"Authorization": "Bearer x"}).json()
+    kid = client.post(
+        "/tree/members",
+        json={"first_name": "Sam", "last_name": "Lee", "dob": "05/06/2005"},
+        headers={"Authorization": "Bearer x"},
+    ).json()
     # set relation under dad
     fake_db.collection("relations").add({"child_id": kid["id"], "parent_id": dad["id"]})
     # tree should show couple and one child
@@ -194,13 +223,29 @@ def test_spouse_linking_and_tree_roots_and_children_merge():
 
 def test_update_rename_conflict_and_move_and_delete():
     client = TestClient(app)
-    a = client.post("/tree/members", json={"first_name": "Tom", "last_name": "A", "dob": "01/01/1990"}, headers={"Authorization": "Bearer x"}).json()
-    b = client.post("/tree/members", json={"first_name": "Jerry", "last_name": "B", "dob": "01/01/1991"}, headers={"Authorization": "Bearer x"}).json()
+    a = client.post(
+        "/tree/members",
+        json={"first_name": "Tom", "last_name": "A", "dob": "01/01/1990"},
+        headers={"Authorization": "Bearer x"},
+    ).json()
+    b = client.post(
+        "/tree/members",
+        json={"first_name": "Jerry", "last_name": "B", "dob": "01/01/1991"},
+        headers={"Authorization": "Bearer x"},
+    ).json()
     # rename b to Tom A -> conflict
-    r = client.patch(f"/tree/members/{b['id']}", json={"id": b["id"], "first_name": "Tom", "last_name": "A"}, headers={"Authorization": "Bearer x"})
+    r = client.patch(
+        f"/tree/members/{b['id']}",
+        json={"id": b["id"], "first_name": "Tom", "last_name": "A"},
+        headers={"Authorization": "Bearer x"},
+    )
     assert r.status_code == 409
     # move a under b
-    r = client.post("/tree/move", json={"child_id": a["id"], "new_parent_id": b["id"]}, headers={"Authorization": "Bearer x"})
+    r = client.post(
+        "/tree/move",
+        json={"child_id": a["id"], "new_parent_id": b["id"]},
+        headers={"Authorization": "Bearer x"},
+    )
     assert r.status_code == 200
     # cannot delete b while has children
     r = client.delete(f"/tree/members/{b['id']}", headers={"Authorization": "Bearer x"})
@@ -232,12 +277,14 @@ def test_invites_generate_and_list_filters():
 
     # mark first as redeemed
     first = codes[0]
-    FakeDoc(fake_db._store, "invites", first).update({
-        "active": False,
-        "used_by": "newuser",
-        "used_email": "new@user.com",
-        "used_at": "now",
-    })
+    FakeDoc(fake_db._store, "invites", first).update(
+        {
+            "active": False,
+            "used_by": "newuser",
+            "used_email": "new@user.com",
+            "used_at": "now",
+        }
+    )
 
     # filter unredeemed
     r = client.get("/auth/invites?view=unredeemed", headers={"Authorization": "Bearer x"})
@@ -260,7 +307,9 @@ def test_forgot_password_flow_ok_even_when_not_exists_and_when_email_matches():
     assert r.json().get("ok") is True
 
     # create a user doc directly
-    FakeDoc(fake_db._store, "users", "alice").set({"email": "alice@example.com", "password_hash": "x"})
+    FakeDoc(fake_db._store, "users", "alice").set(
+        {"email": "alice@example.com", "password_hash": "x"}
+    )
     # wrong email still returns ok True (don’t reveal user existence)
     r = client.post("/auth/forgot", json={"username": "alice", "email": "wrong@example.com"})
     assert r.status_code == 200

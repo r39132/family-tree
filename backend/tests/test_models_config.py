@@ -1,7 +1,15 @@
 from app.config import Settings
-from app.models import *
-import pytest
-from datetime import datetime
+from app.models import (
+    CreateMember,
+    ForgotRequest,
+    LoginRequest,
+    Member,
+    MoveRequest,
+    RegisterRequest,
+    ResetRequest,
+    SpouseRequest,
+    TokenResponse,
+)
 
 
 def test_settings_defaults():
@@ -22,7 +30,7 @@ def test_register_request_model():
         email="test@example.com",
         password="password123",
         confirm_password="password123",
-        invite_code="abc123"
+        invite_code="abc123",
     )
     assert req.username == "testuser"
     assert req.email == "test@example.com"
@@ -48,7 +56,7 @@ def test_reset_request_model():
         username="testuser",
         token="abc123",
         new_password="newpass123",
-        confirm_password="newpass123"
+        confirm_password="newpass123",
     )
     assert req.username == "testuser"
     assert req.token == "abc123"
@@ -64,11 +72,7 @@ def test_token_response_model():
 def test_member_model():
     """Test Member model"""
     member = Member(
-        id="123",
-        first_name="John",
-        last_name="Doe",
-        dob="01/15/1990",
-        email="john@example.com"
+        id="123", first_name="John", last_name="Doe", dob="01/15/1990", email="john@example.com"
     )
     assert member.id == "123"
     assert member.first_name == "John"
@@ -77,11 +81,7 @@ def test_member_model():
 
 def test_create_member_model():
     """Test CreateMember model"""
-    member = CreateMember(
-        first_name="Jane",
-        last_name="Smith",
-        dob="05/20/1985"
-    )
+    member = CreateMember(first_name="Jane", last_name="Smith", dob="05/20/1985")
     assert member.first_name == "Jane"
     assert member.last_name == "Smith"
     assert member.dob == "05/20/1985"
@@ -127,7 +127,7 @@ def test_member_optional_fields():
         phone="555-1234",
         hobbies=["reading", "hiking"],
         spouse_id="spouse123",
-        is_deceased=True
+        is_deceased=True,
     )
     assert member.middle_name == "Michael"
     assert member.birth_location == "New York"

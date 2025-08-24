@@ -1,9 +1,12 @@
 import pytest
-from datetime import datetime, timezone, timedelta
-from app.auth_utils import hash_password, verify_password, create_access_token, create_reset_token, decode_token
-from app.deps import get_current_username
-from fastapi import HTTPException
-from unittest.mock import Mock
+
+from app.auth_utils import (
+    create_access_token,
+    create_reset_token,
+    decode_token,
+    hash_password,
+    verify_password,
+)
 
 
 def test_hash_password():

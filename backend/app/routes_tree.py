@@ -1,16 +1,20 @@
-from fastapi import APIRouter, HTTPException, Depends
-from .models import Member, MoveRequest, CreateMember, SpouseRequest
-from .firestore_client import get_db
-from .deps import get_current_username
-from typing import Dict, Any, List, Optional
-from google.api_core.exceptions import AlreadyExists
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from google.api_core.exceptions import AlreadyExists
+
+from .deps import get_current_username
+from .firestore_client import get_db
+from .models import CreateMember, Member, MoveRequest, SpouseRequest
 
 
 def _name_key(first_name: str, last_name: str) -> str:
     return f"{(first_name or '').strip().lower()}|{(last_name or '').strip().lower()}"
 
+
 router = APIRouter(prefix="/tree", tags=["tree"])
+
 
 @router.get("", response_model=Dict[str, Any])
 def get_tree(username: str = Depends(get_current_username)):
@@ -28,14 +32,17 @@ def get_tree(username: str = Depends(get_current_username)):
         sid = m.get("spouse_id")
         if sid:
             spouse_of[mid] = sid
+
     def build(node_id: Optional[str]):
         built = []
         seen: set[str] = set()
         # Include children of this node AND of its spouse (to represent couple's children)
         parent_partner_id = spouse_of.get(node_id) if node_id else None
-        combined_children = list(dict.fromkeys(
-            (children.get(node_id, []) or []) + (children.get(parent_partner_id, []) or [])
-        ))
+        combined_children = list(
+            dict.fromkeys(
+                (children.get(node_id, []) or []) + (children.get(parent_partner_id, []) or [])
+            )
+        )
         for cid in combined_children:
             if cid in seen:
                 continue
@@ -49,11 +56,14 @@ def get_tree(username: str = Depends(get_current_username)):
             seen.add(cid)
             built.append(node)
         return built
+
     # Roots: explicitly parent_id None OR members with no relation at all,
     # but exclude a member from roots if their spouse is a child elsewhere (so they pair under the spouse)
     related_children = {c for cl in children.values() for c in cl}
     explicit_roots = children.get(None, [])
-    no_relation = [mid for mid in members.keys() if mid not in related_children and mid not in explicit_roots]
+    no_relation = [
+        mid for mid in members.keys() if mid not in related_children and mid not in explicit_roots
+    ]
     filtered_no_relation = []
     for mid in no_relation:
         sid = spouse_of.get(mid)
@@ -77,6 +87,7 @@ def get_tree(username: str = Depends(get_current_username)):
         roots.append(node)
     return {"roots": roots, "members": list(members.values())}
 
+
 @router.post("/members", response_model=Member)
 def create_member(member: CreateMember, username: str = Depends(get_current_username)):
     db = get_db()
@@ -86,7 +97,9 @@ def create_member(member: CreateMember, username: str = Depends(get_current_user
         # Ensure uniqueness by creating a guard doc; fails if exists
         key_ref.create({"_": True})
     except AlreadyExists:
-        raise HTTPException(status_code=409, detail="Member with same first_name and last_name already exists")
+        raise HTTPException(
+            status_code=409, detail="Member with same first_name and last_name already exists"
+        )
     doc_ref = db.collection("members").document()
     data = member.model_dump(exclude={"id"}) | {"name_key": key}
     # derive timestamp field from MM/DD/YYYY
@@ -107,6 +120,7 @@ def create_member(member: CreateMember, username: str = Depends(get_current_user
         raise
     return Member(id=doc_ref.id, **data)
 
+
 @router.patch("/members/{member_id}", response_model=Member)
 def update_member(member_id: str, member: Member, username: str = Depends(get_current_username)):
     db = get_db()
@@ -125,7 +139,9 @@ def update_member(member_id: str, member: Member, username: str = Depends(get_cu
     # Handle potential rename with uniqueness
     new_first = data.get("first_name", current.get("first_name"))
     new_last = data.get("last_name", current.get("last_name"))
-    old_key = current.get("name_key") or _name_key(current.get("first_name", ""), current.get("last_name", ""))
+    old_key = current.get("name_key") or _name_key(
+        current.get("first_name", ""), current.get("last_name", "")
+    )
     new_key = _name_key(new_first, new_last)
     if new_key != old_key:
         key_ref = db.collection("member_keys").document(new_key)
@@ -136,7 +152,10 @@ def update_member(member_id: str, member: Member, username: str = Depends(get_cu
             # If it belongs to this member, allow; else conflict
             doc = key_ref.get()
             if doc.exists and (doc.to_dict() or {}).get("member_id") != member_id:
-                raise HTTPException(status_code=409, detail="Member with same first_name and last_name already exists")
+                raise HTTPException(
+                    status_code=409,
+                    detail="Member with same first_name and last_name already exists",
+                )
         # Update member and swap keys
         data["name_key"] = new_key
         ref.update(data)
@@ -150,6 +169,7 @@ def update_member(member_id: str, member: Member, username: str = Depends(get_cu
         ref.update(data)
     new = ref.get().to_dict()
     return Member(id=member_id, **new)
+
 
 @router.delete("/members/{member_id}")
 def delete_member(member_id: str, username: str = Depends(get_current_username)):
@@ -173,6 +193,7 @@ def delete_member(member_id: str, username: str = Depends(get_current_username))
                 pass
     db.collection("members").document(member_id).delete()
     return {"ok": True}
+
 
 @router.post("/members/{member_id}/spouse")
 def set_spouse(member_id: str, req: SpouseRequest, username: str = Depends(get_current_username)):
@@ -199,6 +220,7 @@ def set_spouse(member_id: str, req: SpouseRequest, username: str = Depends(get_c
             sref.update({"spouse_id": member_id})
     return {"ok": True}
 
+
 @router.post("/move")
 def move(req: MoveRequest, username: str = Depends(get_current_username)):
     db = get_db()
@@ -206,8 +228,5 @@ def move(req: MoveRequest, username: str = Depends(get_current_username)):
     for rel in db.collection("relations").where("child_id", "==", req.child_id).stream():
         db.collection("relations").document(rel.id).delete()
     # Set new parent (None -> root)
-    db.collection("relations").add({
-        "child_id": req.child_id,
-        "parent_id": req.new_parent_id
-    })
+    db.collection("relations").add({"child_id": req.child_id, "parent_id": req.new_parent_id})
     return {"ok": True}
