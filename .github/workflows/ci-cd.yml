@@ -1,3 +1,4 @@
+# .github/workflows/ci-cd.yml
 name: CI/CD
 
 on:
@@ -18,7 +19,10 @@ on:
 jobs:
   backend-ci:
     runs-on: ubuntu-latest
-    # ... your CI steps
+    steps:
+      - uses: actions/checkout@v4
+      - name: Quick CI sanity check
+        run: echo "CI ran on $GITHUB_SHA"
 
   backend-deploy:
     needs: backend-ci
@@ -56,21 +60,4 @@ jobs:
         run: |
           IMAGE=${{ secrets.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/family-tree/family-tree-api:$(git rev-parse --short HEAD)
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
-          docker build -t $IMAGE .
-          docker push $IMAGE
-
-      - name: Use existing image if not building
-        if: ${{ inputs.build_image == false }}
-        run: |
-          # Example: use latest image tagged on main; adjust to your tagging scheme
-          IMAGE=${{ secrets.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/family-tree/family-tree-api:main
-          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
-
-      - name: Deploy to Cloud Run
-        run: |
-          gcloud run deploy ${{ secrets.CLOUD_RUN_SERVICE }} \
-            --image "$IMAGE" \
-            --region ${{ secrets.CLOUD_RUN_REGION }} \
-            --platform managed \
-            --allow-unauthenticated \
-            --set-env-vars "GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }},FIRESTORE_DATABASE=family-tree"
+          docker build -
