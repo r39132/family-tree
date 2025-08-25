@@ -1,123 +1,56 @@
-name: CI/CD
+# Add under `jobs:` in .github/workflows/ci-cd.yml
 
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-    inputs:
-      ref:
-        description: "Git ref to deploy (branch, tag, or SHA)"
-        required: false
-        default: "main"
-      build_image:
-        description: "Build & push image before deploy?"
-        required: false
-        type: boolean
-        default: true
-
-jobs:
-  backend-ci:
+  coverage-badge:
     runs-on: ubuntu-latest
+    # optional: wait for your lightweight CI job first
+    needs: backend-ci
     permissions:
-      contents: write
-    env:
-      GOOGLE_CLOUD_PROJECT: family-tree-ci
-      JWT_SECRET: test-secret
-    defaults:
-      run:
-        working-directory: backend
+      contents: write   # needed to push docs/coverage.svg to the repo
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
-
-      - name: Install deps
-        run: uv sync
-
-      - name: Run pre-commit (commit-stage hooks)
+      - name: Install test + badge tooling
         run: |
-          uv run pre-commit install
-          uv run pre-commit run --all-files --hook-stage commit
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov genbadge[coverage]
 
-      - name: Run pre-commit (push-stage hooks incl. pytest)
+      - name: Run tests with coverage (from backend/)
+        working-directory: backend
         run: |
-          uv run pre-commit run --all-files --hook-stage push
+          # Adjust --cov target if your package name differs
+          pytest -q --cov=app --cov-report=xml
+          test -f coverage.xml
 
-      - name: Generate coverage badge (ensure coverage.xml exists)
+      - name: Generate SVG badge at repo root
+        working-directory: backend
         run: |
-          if [ ! -f coverage.xml ]; then
-            echo "coverage.xml missing; running pytest to generate XML report"
-            uv run pytest -q --cov=app --cov-report=xml
-          fi
-          uv run python coverage_badge.py
+          mkdir -p ../docs
+          genbadge coverage -i coverage.xml -o ../docs/coverage.svg
+          ls -l ../docs/coverage.svg
 
-      - name: Upload coverage artifacts
+      - name: Upload coverage artifacts (for debugging)
         uses: actions/upload-artifact@v4
         with:
-          name: backend-coverage
+          name: coverage-artifacts
           path: |
-            coverage.xml
-            coverage.svg
+            backend/coverage.xml
+            docs/coverage.svg
 
-      - name: Commit coverage badge to repo (main branch only)
-        if: github.ref == 'refs/heads/main'
+      - name: Commit badge to main (only on main)
+        if: ${{ github.ref == 'refs/heads/main' }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add coverage.svg
-          git commit -m "chore(ci): update coverage badge [skip ci]" || echo "No changes to commit"
-          git push
-
-  backend-deploy:
-    needs: backend-ci
-    runs-on: ubuntu-latest
-    if: >
-      ${{
-        (github.event_name == 'push' && github.ref == 'refs/heads/main')
-        || github.event_name == 'workflow_dispatch'
-      }}
-    defaults:
-      run:
-        working-directory: backend
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.ref || 'main' }}
-
-      - name: Google Cloud auth
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Setup gcloud
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-
-      - name: Docker auth for Artifact Registry
-        run: gcloud auth configure-docker ${{ secrets.GAR_LOCATION }}-docker.pkg.dev
-
-      - name: Build & push image (optional)
-        if: ${{ inputs.build_image != false }}
-        run: |
-          IMAGE=${{ secrets.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/family-tree/family-tree-api:$(git rev-parse --short HEAD)
-          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
-          docker build -t $IMAGE .
-          docker push $IMAGE
-
-      - name: Deploy to Cloud Run
-        run: |
-          gcloud run deploy ${{ secrets.CLOUD_RUN_SERVICE }} \
-            --image ${IMAGE} \
-            --region ${{ secrets.CLOUD_RUN_REGION }} \
-            --platform managed \
-            --allow-unauthenticated \
-            --set-env-vars "GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }},FIRESTORE_DATABASE=family-tree"
+          if git diff --quiet docs/coverage.svg; then
+            echo "No badge change."
+          else
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs/coverage.svg
+            git commit -m "chore(ci): update coverage badge [skip ci]"
+            git push
+          fi
