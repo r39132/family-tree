@@ -9,6 +9,8 @@
 ![pytest](https://img.shields.io/badge/tests-pytest-0A9EDC)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 ![Coverage](backend/coverage.svg)
+![Coverage](docs/coverage.svg)
+
 <!-- If you adopt GitHub Actions, replace repo and workflow names below -->
 [![CI-CD](https://github.com/r39132/family-tree/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/r39132/family-tree/actions/workflows/ci-cd.yml)
 
