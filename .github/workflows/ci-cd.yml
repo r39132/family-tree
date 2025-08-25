@@ -40,12 +40,17 @@ jobs:
       - name: Install deps
         run: uv sync
 
-      - name: Lint & Test
+      - name: Run pre-commit (commit-stage hooks)
         run: |
-          uv run ruff check .
-          uv run ruff format --check .
-          uv run pytest --maxfail=1 --disable-warnings -q --cov=app --cov-report=xml
-          uv run python coverage_badge.py
+          uv run pre-commit install
+          uv run pre-commit run --all-files --hook-stage commit
+
+      - name: Run pre-commit (push-stage hooks incl. pytest)
+        run: |
+          uv run pre-commit run --all-files --hook-stage push
+
+      - name: Generate coverage badge
+        run: uv run python coverage_badge.py
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v4
