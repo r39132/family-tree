@@ -112,11 +112,17 @@ def create_member(
         )
     doc_ref = db.collection("members").document()
     data = member.model_dump(exclude={"id"}) | {"name_key": key}
-    # derive timestamp field from MM/DD/YYYY
+    # derive timestamp field from MM/DD/YYYY and disallow future dates
     try:
         dob_dt = datetime.strptime(member.dob, "%m/%d/%Y").replace(tzinfo=timezone.utc)
+        # Validate not in the future
+        if dob_dt > datetime.now(timezone.utc):
+            raise HTTPException(status_code=400, detail="Date of Birth cannot be in the future")
         data["dob_ts"] = dob_dt
+    except HTTPException:
+        raise
     except Exception:
+        # leave unparsed; tolerated by model, but dob_ts will be absent
         pass
     try:
         doc_ref.set(data)
@@ -149,8 +155,13 @@ def update_member(
     if "dob" in data and data.get("dob"):
         try:
             dob_dt = datetime.strptime(data["dob"], "%m/%d/%Y").replace(tzinfo=timezone.utc)
+            if dob_dt > datetime.now(timezone.utc):
+                raise HTTPException(status_code=400, detail="Date of Birth cannot be in the future")
             data["dob_ts"] = dob_dt
+        except HTTPException:
+            raise
         except Exception:
+            # Leave as-is if unparsable
             pass
     # Handle potential rename with uniqueness
     new_first = data.get("first_name", current.get("first_name"))

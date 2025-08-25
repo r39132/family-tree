@@ -26,7 +26,21 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
     }
     if(values.first_name && !nameRe.test(values.first_name.trim())) errs.first_name = 'Only letters and - are allowed.';
     if(values.last_name && !nameRe.test(values.last_name.trim())) errs.last_name = 'Only letters and - are allowed.';
-    if(values.dob && !dobRe.test(values.dob.trim())) errs.dob = 'Use MM/DD/YYYY format.';
+    if(values.dob){
+      const dobVal = values.dob.trim();
+      if(!dobRe.test(dobVal)){
+        errs.dob = 'Use MM/DD/YYYY format.';
+      }else{
+        // Disallow future dates
+        const [mm,dd,yyyy] = dobVal.split('/').map((s:string)=>parseInt(s,10));
+        const dt = new Date(Date.UTC(yyyy, mm-1, dd, 0, 0, 0));
+        const today = new Date();
+        const todayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+        if(dt.getTime() > todayUTC.getTime()){
+          errs.dob = 'Date of Birth cannot be in the future.';
+        }
+      }
+    }
     if(values.email && !emailRe.test(values.email.trim())) errs.email = 'Error: Not a valid email format';
     return errs;
   }
