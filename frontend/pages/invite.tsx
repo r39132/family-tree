@@ -5,7 +5,9 @@ import TopNav from '../components/TopNav';
 
 type InviteItem = {
   code: string;
-  active: boolean;
+  status?: 'available'|'invite-sent'|'redeemed';
+  // legacy booleans from older backend responses
+  active?: boolean;
   used_by?: string;
   used_email?: string;
   used_at?: any;
@@ -55,11 +57,21 @@ export default function Invite(){
     }
   }
 
+  const getStatus = (row: InviteItem): 'available'|'invite-sent'|'redeemed' => {
+    if (row.status) return row.status;
+    // Fallback for legacy shape: derive from fields; ignore active if redeemed fields are present
+    if (row.used_by) return 'redeemed';
+    if (row.sent_email) return 'invite-sent';
+    // If legacy 'active' exists and is false, treat as redeemed
+    if (row.active === false) return 'redeemed';
+    return 'available';
+  };
+
   const filtered = useMemo(()=>{
     let out = invites;
-    if(view === 'redeemed') out = invites.filter(i=>!i.active);
-    if(view === 'available') out = invites.filter(i=>i.active && !i.sent_email);
-    if(view === 'invite-sent') out = invites.filter(i=>i.active && i.sent_email);
+    if(view === 'redeemed') out = invites.filter(i=>getStatus(i) === 'redeemed');
+    if(view === 'available') out = invites.filter(i=>getStatus(i) === 'available');
+    if(view === 'invite-sent') out = invites.filter(i=>getStatus(i) === 'invite-sent');
     return out;
   }, [invites, view]);
   const countLabel = useMemo(()=>{
@@ -132,9 +144,9 @@ export default function Invite(){
             </thead>
             <tbody>
               {filtered.map(row=>{
-                const redeemed = !row.active;
+                const st = getStatus(row);
                 const dateStr = row.used_at ? String(row.used_at) : '';
-                const status = redeemed ? 'Redeemed' : (row.sent_email ? 'Invite Sent' : 'Available');
+                const status = st === 'redeemed' ? 'Redeemed' : (st === 'invite-sent' ? 'Invite Sent' : 'Available');
                 return (
                   <tr key={row.code}>
                     <td style={{padding:'8px'}}><code>{row.code}</code></td>
@@ -143,7 +155,7 @@ export default function Invite(){
                     <td style={{padding:'8px'}}>{dateStr}</td>
                     <td style={{padding:'8px'}}>{status}</td>
                     <td style={{padding:'8px'}}>
-                      {!redeemed && !row.sent_email && (
+                      {st === 'available' && (
                         <Link href={`/invite/email-link?code=${encodeURIComponent(row.code)}`}>Email Registration Link</Link>
                       )}
                     </td>

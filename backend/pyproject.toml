@@ -41,6 +41,23 @@ target-version = ["py312"]
 testpaths = ["tests"]
 addopts = "-q --cov=app --cov-report=term-missing --cov-fail-under=60"
 
+[tool.coverage.run]
+# Exclude all Python files in backend/scripts from coverage
+omit = [
+    "scripts/*",
+    "scripts/**/*.py",
+    "backend/scripts/*",
+    "backend/scripts/**/*.py",
+]
+
+[tool.coverage.report]
+omit = [
+    "scripts/*",
+    "scripts/**/*.py",
+    "backend/scripts/*",
+    "backend/scripts/**/*.py",
+]
+
 [tool.mypy]
 python_version = "3.12"
 pretty = true

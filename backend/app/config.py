@@ -7,10 +7,10 @@ class Settings(BaseSettings):
     app_version: str = Field(default="0.1.0", alias="APP_VERSION")
     debug: bool = Field(default=True, alias="DEBUG")
 
-    google_cloud_project: str = Field(..., alias="GOOGLE_CLOUD_PROJECT")
+    google_cloud_project: str = Field(default="local-dev", alias="GOOGLE_CLOUD_PROJECT")
     firestore_database: str = Field(default="(default)", alias="FIRESTORE_DATABASE")
 
-    jwt_secret: str = Field(..., alias="JWT_SECRET")
+    jwt_secret: str = Field(default="dev-secret", alias="JWT_SECRET")
     jwt_alg: str = Field(default="HS256", alias="JWT_ALG")
     access_token_expire_minutes: int = Field(default=60, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
 
