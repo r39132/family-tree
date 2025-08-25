@@ -76,12 +76,15 @@ jobs:
       - name: Commit badge to main (main or manual main)
         if: ${{ github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.ref == '' || github.event.inputs.ref == 'main')) }}
         run: |
-          if git diff --quiet docs/coverage.svg; then
+          set -e
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Stage the badge (handles first-time add and updates)
+          git add -A docs/coverage.svg
+          # Commit only if something changed in the index
+          if git diff --cached --quiet; then
             echo "No badge change."
           else
-            git config user.name  "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add docs/coverage.svg
             git commit -m "chore(ci): update coverage badge [skip ci]"
             git push
           fi
