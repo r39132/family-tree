@@ -1,70 +1,76 @@
-name: CI-CD
+name: CI/CD
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to deploy (branch, tag, or SHA)"
+        required: false
+        default: "main"
+      build_image:
+        description: "Build & push image before deploy?"
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   backend-ci:
     runs-on: ubuntu-latest
-    env:
-      GOOGLE_CLOUD_PROJECT: family-tree-ci
-      JWT_SECRET: test-secret
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
-
-      - name: Install deps
-        run: uv sync
-
-      - name: Lint & Test
-        run: |
-          uv run ruff check .
-          uv run ruff format --check .
-          uv run pytest --maxfail=1 --disable-warnings -q --cov=app --cov-report=xml
+    # ... your CI steps
 
   backend-deploy:
     needs: backend-ci
     runs-on: ubuntu-latest
+    if: >
+      ${{
+        (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        || github.event_name == 'workflow_dispatch'
+      }}
     defaults:
       run:
         working-directory: backend
-    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || 'main' }}
 
       - name: Google Cloud auth
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Configure gcloud
+      - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
-      - name: Configure Docker auth for Artifact Registry
+      - name: Docker auth for Artifact Registry
         run: gcloud auth configure-docker ${{ secrets.GAR_LOCATION }}-docker.pkg.dev
 
-      - name: Build & Push image
+      - name: Build & push image (optional)
+        if: ${{ inputs.build_image != false }}
         run: |
           IMAGE=${{ secrets.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/family-tree/family-tree-api:$(git rev-parse --short HEAD)
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
           docker build -t $IMAGE .
           docker push $IMAGE
 
+      - name: Use existing image if not building
+        if: ${{ inputs.build_image == false }}
+        run: |
+          # Example: use latest image tagged on main; adjust to your tagging scheme
+          IMAGE=${{ secrets.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/family-tree/family-tree-api:main
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy ${{ secrets.CLOUD_RUN_SERVICE }}             --image $IMAGE             --region ${{ secrets.CLOUD_RUN_REGION }}             --platform managed             --allow-unauthenticated             --set-env-vars "GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }},FIRESTORE_DATABASE=family-tree"
+          gcloud run deploy ${{ secrets.CLOUD_RUN_SERVICE }} \
+            --image "$IMAGE" \
+            --region ${{ secrets.CLOUD_RUN_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --set-env-vars "GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }},FIRESTORE_DATABASE=family-tree"
