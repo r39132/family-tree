@@ -43,6 +43,10 @@ def send_mail(to_email: str, subject: str, body: str):
         s.send_message(msg)
 
 
+class EmailInviteRequest:
+    pass
+
+
 @router.post("/register")
 def register(payload: RegisterRequest):
     db = get_db()
@@ -149,14 +153,51 @@ def list_invites(view: str = "all", current_user: str = Depends(get_current_user
             "used_by": data.get("used_by"),
             "used_email": data.get("used_email"),
             "used_at": data.get("used_at"),
+            "sent_email": data.get("sent_email"),
+            "sent_at": data.get("sent_at"),
         }
         items.append(item)
     v = (view or "all").lower()
     if v == "redeemed":
         items = [i for i in items if not i.get("active") and i.get("used_by")]
-    elif v == "unredeemed":
-        items = [i for i in items if i.get("active")]
+    elif v == "available":
+        # active and not yet emailed
+        items = [i for i in items if i.get("active") and not i.get("sent_email")]
+    elif v in ("invite-sent", "invitesent", "sent"):
+        # active and email was sent
+        items = [i for i in items if i.get("active") and i.get("sent_email")]
     return {"ok": True, "invites": items}
+
+
+@router.post("/invites/{code}/email")
+def email_invite_link(code: str, payload: dict, current_user: str = Depends(get_current_username)):
+    """Send a registration link via email for an unredeemed invite token."""
+    to_email = payload.get("email")
+    if not to_email:
+        raise HTTPException(status_code=400, detail="email is required")
+    db = get_db()
+    ref = db.collection("invites").document(code)
+    doc = ref.get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    data = doc.to_dict() or {}
+    if not data.get("active", False):
+        raise HTTPException(status_code=400, detail="Invite has already been redeemed")
+    register_link = f"{'http://localhost:3000'}/register?invite={code}"
+    body = (
+        "You're invited to join Family Tree!\n\n"
+        f"Use this link to register: {register_link}\n\n"
+        "If you didn't expect this, you can ignore this email."
+    )
+    send_mail(to_email, "Your Family Tree invitation", body)
+    # Record that an invite email was sent
+    ref.update(
+        {
+            "sent_email": to_email,
+            "sent_at": firestore.SERVER_TIMESTAMP,
+        }
+    )
+    return {"ok": True, "sent_email": to_email}
 
 
 @router.post("/reset")

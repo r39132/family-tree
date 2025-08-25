@@ -9,16 +9,18 @@ type InviteItem = {
   used_by?: string;
   used_email?: string;
   used_at?: any;
+  sent_email?: string;
+  sent_at?: any;
 };
 
 export default function Invite(){
   const [error, setError] = useState<string|undefined>();
   const [count, setCount] = useState<number>(1);
-  const [view, setView] = useState<'all'|'redeemed'|'unredeemed'>('all');
+  const [view, setView] = useState<'all'|'redeemed'|'available'|'invite-sent'>('all');
   const [invites, setInvites] = useState<InviteItem[]>([]);
   const [justCreated, setJustCreated] = useState<string[]>([]);
 
-  async function loadInvites(v: 'all'|'redeemed'|'unredeemed' = view){
+  async function loadInvites(v: 'all'|'redeemed'|'available'|'invite-sent' = view){
     try{
       const res = await api(`/auth/invites?view=${v}`);
       setInvites(res.invites || []);
@@ -54,8 +56,18 @@ export default function Invite(){
   }
 
   const filtered = useMemo(()=>{
-    return invites;
-  }, [invites]);
+    let out = invites;
+    if(view === 'redeemed') out = invites.filter(i=>!i.active);
+    if(view === 'available') out = invites.filter(i=>i.active && !i.sent_email);
+    if(view === 'invite-sent') out = invites.filter(i=>i.active && i.sent_email);
+    return out;
+  }, [invites, view]);
+  const countLabel = useMemo(()=>{
+  if(view === 'redeemed') return 'redeemed';
+  if(view === 'available') return 'available';
+  if(view === 'invite-sent') return 'invite(s) sent';
+    return 'total';
+  }, [view]);
 
   return (
     <div className="container">
@@ -96,9 +108,14 @@ export default function Invite(){
             <select value={view} onChange={async e=>{ const v=e.target.value as any; setView(v); await loadInvites(v); }}>
               <option value="all">All</option>
               <option value="redeemed">Redeemed</option>
-              <option value="unredeemed">Unredeemed</option>
+              <option value="available">Available</option>
+              <option value="invite-sent">Invite Sent</option>
             </select>
           </div>
+        </div>
+
+        <div style={{marginTop:8}}>
+          <span className="badge">{filtered.length}</span> {countLabel} token(s)
         </div>
 
         <div style={{overflowX:'auto', marginTop:12}}>
@@ -110,19 +127,26 @@ export default function Invite(){
                 <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Redeemer Username</th>
                 <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Redeemed At</th>
                 <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Status</th>
+                <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(row=>{
                 const redeemed = !row.active;
                 const dateStr = row.used_at ? String(row.used_at) : '';
+                const status = redeemed ? 'Redeemed' : (row.sent_email ? 'Invite Sent' : 'Available');
                 return (
                   <tr key={row.code}>
                     <td style={{padding:'8px'}}><code>{row.code}</code></td>
-                    <td style={{padding:'8px'}}>{row.used_email || ''}</td>
+                    <td style={{padding:'8px'}}>{row.used_email || row.sent_email || ''}</td>
                     <td style={{padding:'8px'}}>{row.used_by || ''}</td>
                     <td style={{padding:'8px'}}>{dateStr}</td>
-                    <td style={{padding:'8px'}}>{redeemed ? 'Redeemed' : 'Unredeemed'}</td>
+                    <td style={{padding:'8px'}}>{status}</td>
+                    <td style={{padding:'8px'}}>
+                      {!redeemed && !row.sent_email && (
+                        <Link href={`/invite/email-link?code=${encodeURIComponent(row.code)}`}>Email Registration Link</Link>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
