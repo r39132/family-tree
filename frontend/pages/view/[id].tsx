@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import TopNav from '../../components/TopNav';
 import { api } from '../../lib/api';
 
@@ -7,6 +7,7 @@ export default function ViewMemberPage(){
   const router = useRouter();
   const { id } = router.query as { id?: string };
   const [member,setMember] = useState<any|null>(null);
+  const [allMembers, setAllMembers] = useState<any[]>([]);
   const [error,setError] = useState<string|null>(null);
 
   useEffect(()=>{
@@ -14,6 +15,7 @@ export default function ViewMemberPage(){
     (async()=>{
       try{
         const data = await api('/tree');
+        setAllMembers(data.members || []);
         const m = (data.members || []).find((x:any)=>x.id===id);
         if(!m) throw new Error('Member not found');
         setMember(m);
@@ -21,11 +23,27 @@ export default function ViewMemberPage(){
     })();
   },[id]);
 
+  const spouse = useMemo(()=>{
+    if(!member?.spouse_id) return null;
+    return (allMembers || []).find((x:any)=>x.id === member.spouse_id) || null;
+  }, [member?.spouse_id, allMembers]);
+
   return (
     <div className="container">
       <TopNav />
       <div className="card">
-        <h2>View member</h2>
+        <h2 style={{display:'flex', alignItems:'center', gap:8}}>
+          View member
+          {member?.is_deceased && (
+            <span style={{
+              fontSize:12,
+              background:'crimson',
+              color:'#fff',
+              borderRadius:12,
+              padding:'2px 8px'
+            }}>Deceased</span>
+          )}
+        </h2>
         {error && <p style={{color:'crimson'}}>{error}</p>}
         {member && (
           <div className="grid2">
@@ -39,6 +57,19 @@ export default function ViewMemberPage(){
             <Field label="Email" value={member.email} />
             <Field label="Phone" value={member.phone} />
             <Field label="Hobbies" value={(member.hobbies||[]).join(', ')} />
+            <Field label="Deceased" value={member.is_deceased ? 'Yes' : 'No'} />
+            <Field
+              label="Spouse/Partner"
+              value={member.spouse_id ? (
+                spouse ? (
+                  <a href={`/view/${spouse.id}`} style={{textDecoration:'underline'}}>
+                    {spouse.first_name} {spouse.last_name}
+                  </a>
+                ) : (
+                  '(Unknown)'
+                )
+              ) : ''}
+            />
           </div>
         )}
         <div className="bottombar">
