@@ -18,10 +18,51 @@ on:
 jobs:
   backend-ci:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GOOGLE_CLOUD_PROJECT: family-tree-ci
+      JWT_SECRET: test-secret
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
-      - name: Quick CI sanity check
-        run: echo "CI ran on $GITHUB_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install deps
+        run: uv sync
+
+      - name: Lint & Test
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run pytest --maxfail=1 --disable-warnings -q --cov=app --cov-report=xml
+          uv run python coverage_badge.py
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: |
+            backend/coverage.xml
+            backend/coverage.svg
+
+      - name: Commit coverage badge to repo (main branch only)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add coverage.svg
+          git commit -m "chore(ci): update coverage badge [skip ci]" || echo "No changes to commit"
+          git push
 
   backend-deploy:
     needs: backend-ci
@@ -59,28 +100,14 @@ jobs:
         run: |
           IMAGE=${{ secrets.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/family-tree/family-tree-api:$(git rev-parse --short HEAD)
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
-          docker build -t "$IMAGE" .
-          docker push "$IMAGE"
-
-      - name: Use existing image if not building
-        if: ${{ inputs.build_image == false }}
-        run: |
-          IMAGE=${{ secrets.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/family-tree/family-tree-api:main
-          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+          docker build -t $IMAGE .
+          docker push $IMAGE
 
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ secrets.CLOUD_RUN_SERVICE }} \
-            --image "$IMAGE" \
+            --image ${IMAGE} \
             --region ${{ secrets.CLOUD_RUN_REGION }} \
             --platform managed \
             --allow-unauthenticated \
             --set-env-vars "GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }},FIRESTORE_DATABASE=family-tree"
-
-      - name: Print Cloud Run URL
-        run: |
-          URL=$(gcloud run services describe ${{ secrets.CLOUD_RUN_SERVICE }} \
-            --region ${{ secrets.CLOUD_RUN_REGION }} \
-            --format='value(status.url)')
-          echo "Service is live at: $URL"
-          echo "url=$URL" >> $GITHUB_ENV
