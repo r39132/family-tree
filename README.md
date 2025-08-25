@@ -7,7 +7,8 @@
 ![Ruff](https://img.shields.io/badge/Lint-ruff-46a7f8)
 ![Black](https://img.shields.io/badge/Format-black-000000)
 ![pytest](https://img.shields.io/badge/tests-pytest-0A9EDC)
-![Coverage](https://img.shields.io/badge/coverage-69%25-brightgreen)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+![Coverage](backend/coverage.svg)
 <!-- If you adopt GitHub Actions, replace repo and workflow names below -->
 [![CI-CD](https://github.com/r39132/family-tree/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/r39132/family-tree/actions/workflows/ci-cd.yml)
 
