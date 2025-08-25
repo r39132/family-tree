@@ -73,8 +73,8 @@ jobs:
             backend/coverage.xml
             docs/coverage.svg
 
-      - name: Commit badge to main (only on main)
-        if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Commit badge to main (main or manual main)
+        if: ${{ github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.ref == '' || github.event.inputs.ref == 'main')) }}
         run: |
           if git diff --quiet docs/coverage.svg; then
             echo "No badge change."
