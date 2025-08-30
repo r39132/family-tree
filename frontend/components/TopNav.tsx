@@ -74,8 +74,9 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
       <div className="topbar-left">
         {authed && (
           <>
-            {showBack && <Link className="btn secondary" href="/">Back to Family Tree</Link>}
-            {showAdd && <Link className="btn secondary" href="/add">Add member</Link>}
+            {showBack && <Link className="btn secondary" href="/">Family Tree</Link>}
+            {showAdd && <Link className="btn secondary" href="/add">Add Member</Link>}
+            <Link className="btn secondary" href="/events">Events</Link>
           </>
         )}
       </div>

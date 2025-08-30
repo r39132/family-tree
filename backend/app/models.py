@@ -180,3 +180,24 @@ class UpdateMember(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     hobbies: Optional[List[str]] = None
+
+
+class EventNotificationSettings(BaseModel):
+    enabled: bool = False
+    user_id: str
+
+
+class FamilyEvent(BaseModel):
+    id: str
+    member_id: str
+    member_name: str
+    event_type: str  # "birthday" or "death_anniversary"
+    event_date: str  # YYYY-MM-DD format for this year's occurrence
+    age_on_date: int
+    original_date: str  # Original birth/death date
+
+
+class EventsResponse(BaseModel):
+    upcoming_events: List[FamilyEvent]
+    past_events: List[FamilyEvent]
+    notification_enabled: bool
