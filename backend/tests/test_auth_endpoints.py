@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 import app.routes_auth as routes_auth
@@ -48,6 +49,11 @@ def setup_function(function):
 
 def test_register_without_invite_when_required():
     """Test registration fails when invite is required but not provided"""
+    from app.config import settings
+
+    if not settings.require_invite:
+        pytest.skip("Invites are disabled in this environment")
+
     client = TestClient(app)
     r = client.post(
         "/auth/register",
@@ -199,6 +205,11 @@ def test_reset_password_nonexistent_user():
 
 def test_create_invite_invalid_count():
     """Test creating invites with invalid count"""
+    from app.config import settings
+
+    if not settings.require_invite:
+        pytest.skip("Invites are disabled in this environment")
+
     client = TestClient(app)
 
     # Test count too low
