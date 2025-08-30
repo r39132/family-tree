@@ -1,22 +1,139 @@
-import os
 import smtplib
-import sys
+import types
+from typing import Dict
 
 import pytest
 
-# Ensure project root (backend folder) is on sys.path
-CURRENT_DIR = os.path.dirname(__file__)
-PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+
+class FakeCollection:
+    def __init__(self, name, db):
+        self.name = name
+        self.db = db
+        self.docs: Dict[str, dict] = {}
+        self._auto = 0
+
+    # Document reference
+    def document(self, doc_id=None):
+        if doc_id is None:
+            doc_id = f"{self.name}-{self._auto}"
+            self._auto += 1
+        coll = self
+
+        class Doc:
+            def __init__(self, id):
+                self.id = id
+
+            def get(self):
+                data = coll.docs.get(self.id)
+                return types.SimpleNamespace(exists=data is not None, to_dict=lambda: data)
+
+            def set(self, data):
+                coll.docs[self.id] = dict(data)
+
+            def update(self, data):
+                coll.docs[self.id] = {**(coll.docs.get(self.id) or {}), **data}
+
+            def delete(self):
+                coll.docs.pop(self.id, None)
+
+        return Doc(doc_id)
+
+    def add(self, data):
+        doc = self.document()
+        doc.set(data)
+        return doc
+
+    # Query API (subset)
+    class Query:
+        def __init__(self, coll, where=None, order_by=None, direction="ASCENDING", limit=None):
+            self.coll = coll
+            self._where = where  # tuple(field, op, value)
+            self._order_by = order_by
+            self._direction = direction
+            self._limit = limit
+
+        def where(self, filter=None, *args, **kwargs):
+            cond = None
+            if filter is not None:
+                cond = (filter.field, filter.op, filter.value)
+            return FakeCollection.Query(
+                self.coll, cond, self._order_by, self._direction, self._limit
+            )
+
+        def order_by(self, field, direction="ASCENDING"):
+            return FakeCollection.Query(self.coll, self._where, field, direction, self._limit)
+
+        def limit(self, n):
+            return FakeCollection.Query(self.coll, self._where, self._order_by, self._direction, n)
+
+        def stream(self):
+            items = list(self.coll.docs.items())
+            # where filter
+            if self._where:
+                f, op, v = self._where
+                if op == "==":
+                    items = [(i, d) for i, d in items if d.get(f) == v]
+            # ordering
+            if self._order_by:
+                reverse = self._direction == "DESCENDING"
+                items.sort(key=lambda t: t[1].get(self._order_by), reverse=reverse)
+            # limit
+            if self._limit is not None:
+                items = items[: self._limit]
+            for id, data in items:
+                yield types.SimpleNamespace(id=id, to_dict=lambda d=data: d)
+
+    def where(self, filter=None, *args, **kwargs):
+        cond = None
+        if filter is not None:
+            cond = (filter.field, filter.op, filter.value)
+        return FakeCollection.Query(self, cond)
+
+    def order_by(self, field, direction="ASCENDING"):
+        return FakeCollection.Query(self, None, field, direction)
+
+    def limit(self, n):
+        return FakeCollection.Query(self, None, None, "ASCENDING", n)
+
+    def stream(self):
+        for id, data in self.docs.items():
+            yield types.SimpleNamespace(id=id, to_dict=lambda d=data: d)
+
+
+class FakeDB:
+    def __init__(self):
+        self.cols = {
+            "members": FakeCollection("members", self),
+            "relations": FakeCollection("relations", self),
+            "member_keys": FakeCollection("member_keys", self),
+            "tree_versions": FakeCollection("tree_versions", self),
+        }
+
+    def collection(self, name):
+        return self.cols[name]
+
+
+@pytest.fixture(autouse=True)
+def fake_db(monkeypatch):
+    # Replace Firestore client and FieldFilter with test doubles
+    db = FakeDB()
+
+    def _get_db():
+        return db
+
+    class FF:
+        def __init__(self, field, op, value):
+            self.field = field
+            self.op = op
+            self.value = value
+
+    monkeypatch.setattr("app.firestore_client.get_db", _get_db)
+    monkeypatch.setattr("app.routes_tree.FieldFilter", FF, raising=False)
+    yield
 
 
 @pytest.fixture(autouse=True)
 def mock_smtp(monkeypatch):
-    """Mock smtplib.SMTP so tests never attempt real SMTP connections.
-
-    Captures sent messages in the returned list for optional assertions.
-    """
     sent_messages = []
 
     class DummySMTP:

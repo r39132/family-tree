@@ -12,6 +12,19 @@ export default function Home(){
   const [selected,setSelected]=useState<any|null>(null);
   const [moveChild,setMoveChild]=useState<string>('');
   const [moveParent,setMoveParent]=useState<string|undefined>(undefined);
+  const [unsaved, setUnsaved] = useState(false);
+  const [versions, setVersions] = useState<any[]>([]);
+  const [recoverId, setRecoverId] = useState<string>('');
+
+  function fmtVersionLabel(iso?: string, _count?: number, version?: number){
+    if(!iso) return '';
+    const d = new Date(iso);
+    const locale = typeof window !== 'undefined' ? navigator.language : 'en-US';
+    const date = d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
+    const time = d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
+    const base = `${date} at ${time}`;
+    return version !== undefined ? `${base} (v${version})` : base;
+  }
   const router = useRouter();
   const [showInvalid, setShowInvalid] = useState(false);
   const [invalidMsgs, setInvalidMsgs] = useState<string[]>([]);
@@ -20,14 +33,41 @@ export default function Home(){
 
   async function load(){
     try{
+      const vs = await api('/tree/versions');
+      setVersions(vs);
       const data = await api('/tree');
       setTree(data);
+      const u = await api('/tree/unsaved');
+      setUnsaved(!!u.unsaved);
     }catch{
       router.push('/login');
     }
   }
 
   useEffect(()=>{ load(); },[]);
+  // Navigation guard
+  useEffect(()=>{
+    const beforeUnload = (e: BeforeUnloadEvent)=>{
+      if(!unsaved) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    const onRouteChangeStart = (url: string)=>{
+      if(!unsaved) return;
+      if(!confirm('You have unsaved changes. Leave without saving?')){
+        // Cancel route change by pushing back to current path
+        router.events.emit('routeChangeError');
+        // eslint-disable-next-line @typescript-eslint/no-throw-literal
+        throw 'routeChange aborted';
+      }
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    router.events.on('routeChangeStart', onRouteChangeStart);
+    return ()=>{
+      window.removeEventListener('beforeunload', beforeUnload);
+      router.events.off('routeChangeStart', onRouteChangeStart);
+    };
+  },[unsaved]);
 
   async function saveMember(m:any){
     // Editing only on this page
@@ -45,15 +85,17 @@ export default function Home(){
   }
 
   async function move(){
-    await api('/tree/move',{method:'POST', body:JSON.stringify({child_id: moveChild, new_parent_id: moveParent || null})});
+  await api('/tree/move',{method:'POST', body:JSON.stringify({child_id: moveChild, new_parent_id: moveParent || null})});
     setMoveChild(''); setMoveParent(undefined);
-    await load();
+  setUnsaved(true);
+  await load();
   }
 
   async function remove(id:string){
     if(confirm('Are you sure you want to delete this member?')){
       await api(`/tree/members/${id}`, {method:'DELETE'});
       setSelected(null);
+      setUnsaved(true);
       await load();
     }
   }
@@ -120,6 +162,21 @@ export default function Home(){
 
     <div className="card">
   <h2>Tree ({tree.members?.length ?? 0})</h2>
+        {unsaved && (
+          <p style={{color:'crimson', marginTop:0}}>You have unsaved changes. Please click Save to create a new version.</p>
+        )}
+        <div className="bottombar" style={{marginTop:8}}>
+          <div className="bottombar-left">
+            <button className="btn" disabled={!unsaved} title={!unsaved ? 'No unsaved changes' : 'Save current tree as a new version'} onClick={async()=>{ const v = await api('/tree/save', { method:'POST' }); setUnsaved(false); const vs=await api('/tree/versions'); setVersions(vs); }}>Save Tree</button>
+          </div>
+          <div className="bottombar-right" style={{display:'flex', gap:8, alignItems:'center'}}>
+            <select value={recoverId} onChange={e=>setRecoverId(e.target.value)}>
+              <option value="">Select version…</option>
+              {versions.map((v:any)=> (<option key={v.id} value={v.id}>{fmtVersionLabel(v.created_at, undefined, v.version)}</option>))}
+            </select>
+            <button className="btn" disabled={!recoverId} onClick={async()=>{ await api('/tree/recover', { method:'POST', body: JSON.stringify({ version_id: recoverId }) }); setUnsaved(false); await load(); }}>Recover</button>
+          </div>
+        </div>
         {tree.roots?.length ? (
           <ul className="tree">
             {tree.roots.map((r:any)=>(<Node key={r.member.id} n={r}/>))}
@@ -172,7 +229,7 @@ export default function Home(){
 
       <div className="card">
         <h2>Add Spouse/Partner</h2>
-        <AddSpouse members={tree.members||[]} onLinked={load} />
+        <AddSpouse members={tree.members||[]} onLinked={async()=>{ await load(); setUnsaved(true); }} />
       </div>
 
   {/* Edit is handled on a dedicated page */}
@@ -201,7 +258,7 @@ function AddSpouse({members,onLinked}:{members:any[]; onLinked: ()=>void}){
     if(!canLink) return;
     await api(`/tree/members/${memberId}/spouse`, { method:'POST', body: JSON.stringify({ spouse_id: partnerId }) });
     setMemberId(''); setPartnerId('');
-    onLinked();
+  onLinked();
   }
   return (
     <>

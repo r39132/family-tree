@@ -155,6 +155,17 @@ class MoveRequest(BaseModel):
     new_parent_id: Optional[str]  # None -> make root
 
 
+class RecoverTreeRequest(BaseModel):
+    version_id: str
+
+
+class TreeVersionInfo(BaseModel):
+    id: str
+    created_at: str
+    version: int
+    relations_count: int | None = None
+
+
 class UpdateMember(BaseModel):
     # All fields optional for PATCH semantics
     first_name: Optional[str] = None

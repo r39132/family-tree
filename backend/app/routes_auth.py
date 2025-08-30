@@ -92,6 +92,21 @@ def login(payload: LoginRequest):
     return TokenResponse(access_token=token)
 
 
+@router.get("/me")
+def get_current_user(current_user: str = Depends(get_current_username)):
+    """Get current user information."""
+    db = get_db()
+    user_doc = db.collection("users").document(current_user).get()
+    if not user_doc.exists:
+        raise HTTPException(status_code=404, detail="User not found")
+    data = user_doc.to_dict()
+    return {
+        "username": current_user,
+        "email": data.get("email"),
+        "created_at": data.get("created_at"),
+    }
+
+
 @router.post("/forgot")
 def forgot(payload: ForgotRequest):
     db = get_db()
