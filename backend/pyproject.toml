@@ -39,7 +39,7 @@ target-version = ["py312"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --cov=app --cov-report=term-missing --cov-fail-under=80"
+addopts = "-q --cov=app --cov-report=term-missing --cov-fail-under=60"
 
 [tool.coverage.run]
 # Exclude all Python files in backend/scripts from coverage

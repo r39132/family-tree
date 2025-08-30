@@ -52,10 +52,19 @@ class FakeCollection:
             self._direction = direction
             self._limit = limit
 
-        def where(self, filter=None, *args, **kwargs):
+        def where(self, field_path=None, op_string=None, value=None, *, filter=None):
             cond = None
             if filter is not None:
-                cond = (filter.field, filter.op, filter.value)
+                # Using the filter keyword argument with fake FF class
+                if hasattr(filter, "field_path"):
+                    # Real FieldFilter
+                    cond = (filter.field_path, filter.op_string, filter.value)
+                else:
+                    # Fake FF class used in tests
+                    cond = (filter.field, filter.op, filter.value)
+            elif field_path is not None and op_string is not None:
+                # Using positional arguments
+                cond = (field_path, op_string, value)
             return FakeCollection.Query(
                 self.coll, cond, self._order_by, self._direction, self._limit
             )
@@ -83,10 +92,19 @@ class FakeCollection:
             for id, data in items:
                 yield types.SimpleNamespace(id=id, to_dict=lambda d=data: d)
 
-    def where(self, filter=None, *args, **kwargs):
+    def where(self, field_path=None, op_string=None, value=None, *, filter=None):
         cond = None
         if filter is not None:
-            cond = (filter.field, filter.op, filter.value)
+            # Using the filter keyword argument with fake FF class
+            if hasattr(filter, "field_path"):
+                # Real FieldFilter
+                cond = (filter.field_path, filter.op_string, filter.value)
+            else:
+                # Fake FF class used in tests
+                cond = (filter.field, filter.op, filter.value)
+        elif field_path is not None and op_string is not None:
+            # Using positional arguments
+            cond = (field_path, op_string, value)
         return FakeCollection.Query(self, cond)
 
     def order_by(self, field, direction="ASCENDING"):
@@ -107,6 +125,7 @@ class FakeDB:
             "relations": FakeCollection("relations", self),
             "member_keys": FakeCollection("member_keys", self),
             "tree_versions": FakeCollection("tree_versions", self),
+            "tree_state": FakeCollection("tree_state", self),
         }
 
     def collection(self, name):

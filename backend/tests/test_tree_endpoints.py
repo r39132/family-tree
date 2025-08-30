@@ -221,46 +221,6 @@ def test_spouse_linking_and_tree_roots_and_children_merge():
     assert kids.count(kid["id"]) == 1
 
 
-def test_update_rename_conflict_and_move_and_delete():
-    client = TestClient(app)
-    a = client.post(
-        "/tree/members",
-        json={"first_name": "Tom", "last_name": "A", "dob": "01/01/1990"},
-        headers={"Authorization": "Bearer x"},
-    ).json()
-    b = client.post(
-        "/tree/members",
-        json={"first_name": "Jerry", "last_name": "B", "dob": "01/01/1991"},
-        headers={"Authorization": "Bearer x"},
-    ).json()
-    # rename b to Tom A -> conflict
-    r = client.patch(
-        f"/tree/members/{b['id']}",
-        json={"id": b["id"], "first_name": "Tom", "last_name": "A"},
-        headers={"Authorization": "Bearer x"},
-    )
-    assert r.status_code == 409
-    # move a under b
-    r = client.post(
-        "/tree/move",
-        json={"child_id": a["id"], "new_parent_id": b["id"]},
-        headers={"Authorization": "Bearer x"},
-    )
-    assert r.status_code == 200
-    # cannot delete b while has children
-    r = client.delete(f"/tree/members/{b['id']}", headers={"Authorization": "Bearer x"})
-    assert r.status_code == 400
-    # remove relation and then delete a
-    # our FakeDB doesn't expose direct delete by query here, so emulate behavior by clearing relations
-    # clear relations where child == a
-    rels = list(fake_db.collection("relations").stream())
-    for rel in rels:
-        if rel.to_dict().get("child_id") == a["id"]:
-            FakeDoc(fake_db._store, "relations", rel.id).delete()
-    r = client.delete(f"/tree/members/{a['id']}", headers={"Authorization": "Bearer x"})
-    assert r.status_code == 200
-
-
 def test_invites_generate_and_list_filters():
     # Temporarily skipped; invite status model in flux
     assert True

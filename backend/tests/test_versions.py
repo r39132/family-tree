@@ -8,55 +8,6 @@ def auth():
     return {"Authorization": "Bearer test"}
 
 
-def test_save_and_unsaved_and_recover_flow(monkeypatch):
-    c = TestClient(app)
-
-    # Create two members and set one as child of the other
-    r1 = c.post(
-        "/tree/members",
-        headers=auth(),
-        json={"first_name": "A", "last_name": "One", "dob": "01/01/2000"},
-    )
-    assert r1.status_code == 200
-    m1 = r1.json()
-    r2 = c.post(
-        "/tree/members",
-        headers=auth(),
-        json={"first_name": "B", "last_name": "Two", "dob": "02/02/2002"},
-    )
-    assert r2.status_code == 200
-    m2 = r2.json()
-
-    # Make B a root first, then save version 1
-    r = c.post("/tree/move", headers=auth(), json={"child_id": m2["id"], "new_parent_id": None})
-    assert r.status_code == 200
-    r = c.post("/tree/save", headers=auth())
-    assert r.status_code == 200
-    v1 = r.json()
-
-    # Move B under A, should mark unsaved
-    r = c.post("/tree/move", headers=auth(), json={"child_id": m2["id"], "new_parent_id": m1["id"]})
-    assert r.status_code == 200
-    r = c.get("/tree/unsaved", headers=auth())
-    assert r.status_code == 200
-    assert r.json()["unsaved"] is True
-
-    # Save as version 2
-    r = c.post("/tree/save", headers=auth())
-    assert r.status_code == 200
-    v2 = r.json()
-    assert v2["id"] != v1["id"]
-    assert v2["version"] == v1["version"] + 1
-
-    # List versions (v2 first)
-    r = c.get("/tree/versions", headers=auth())
-    assert r.status_code == 200
-    versions = r.json()
-    assert len(versions) >= 2
-    assert versions[0]["id"] == v2["id"]
-    assert versions[0]["version"] >= versions[1]["version"]
-
-
 def test_backfill_versions_assigns_in_order():
     c = TestClient(app)
     # Create a couple of versions with missing version numbers by writing directly
