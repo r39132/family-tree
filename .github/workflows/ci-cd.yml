@@ -57,6 +57,7 @@ jobs:
           # adjust --cov target if your package name differs
           uv run pytest -q --cov=app --cov-report=xml
           test -f coverage.xml
+          echo "Coverage report generated successfully"
 
       - name: Generate SVG badge at repo root
         working-directory: backend
@@ -64,6 +65,7 @@ jobs:
           mkdir -p ../docs
           uv run genbadge coverage -i coverage.xml -o ../docs/coverage.svg
           ls -l ../docs/coverage.svg
+          echo "Coverage badge generated successfully"
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v4
@@ -83,8 +85,9 @@ jobs:
           git add -A docs/coverage.svg
           # Commit only if something changed in the index
           if git diff --cached --quiet; then
-            echo "No badge change."
+            echo "No badge change detected."
           else
+            echo "Badge updated, committing changes."
             git commit -m "chore(ci): update coverage badge [skip ci]"
             git push
           fi
@@ -141,7 +144,7 @@ jobs:
             --region ${{ secrets.CLOUD_RUN_REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }},FIRESTORE_DATABASE=family-tree"
+            --set-env-vars "GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }},FIRESTORE_DATABASE=family-tree,ENABLE_MAP=${{ secrets.ENABLE_MAP || 'false' }},GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY || '' }}"
 
       - name: Print Cloud Run URL
         run: |
