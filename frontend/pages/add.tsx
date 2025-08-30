@@ -4,6 +4,7 @@ import TopNav from '../components/TopNav';
 import { api } from '../lib/api';
 import { useState } from 'react';
 import Modal from '../components/Modal';
+import TreeCacheManager from '../lib/treeCache';
 
 export default function AddMemberPage(){
   const router = useRouter();
@@ -17,6 +18,11 @@ export default function AddMemberPage(){
     try{
   const body = normalizePayload(titleCaseAll(m));
   await api('/tree/members', { method:'POST', body: JSON.stringify(body) });
+
+      // Invalidate tree cache since we added a new member
+      const cacheManager = TreeCacheManager.getInstance();
+      cacheManager.invalidateCache('structure_changed');
+
       router.push('/');
     }catch(e:any){
       // Attempt to parse server 422 detail and surface email error inline

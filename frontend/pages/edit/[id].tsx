@@ -4,6 +4,7 @@ import TopNav from '../../components/TopNav';
 import MemberEditor from '../../components/MemberEditor';
 import { api } from '../../lib/api';
 import Modal from '../../components/Modal';
+import TreeCacheManager from '../../lib/treeCache';
 
 export default function EditMemberPage(){
   const router = useRouter();
@@ -37,6 +38,14 @@ export default function EditMemberPage(){
     if(errs.length){ setInvalidMsgs(errs); setShowInvalid(true); return; }
     try{
       const body = normalizePayload(titleCaseAll(m));
+
+      const cacheManager = TreeCacheManager.getInstance();
+
+      // Check if this update affects tree display before making the API call
+      if (cacheManager.shouldInvalidateForMemberUpdate(body)) {
+        cacheManager.invalidateCache('data_changed');
+      }
+
       await api(`/tree/members/${m.id}`, { method:'PATCH', body: JSON.stringify(body) });
       router.push('/');
     }catch(e:any){
