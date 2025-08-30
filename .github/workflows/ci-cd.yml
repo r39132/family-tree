@@ -63,8 +63,7 @@ jobs:
         working-directory: backend
         run: |
           mkdir -p ../docs
-          # Use custom thresholds: green ≥ 60%, orange 40-59%, red < 40%
-          uv run genbadge coverage -i coverage.xml -o ../docs/coverage.svg --thresholds 40 60
+          uv run genbadge coverage -i coverage.xml -o ../docs/coverage.svg
           ls -l ../docs/coverage.svg
           echo "Coverage badge generated successfully"
 
