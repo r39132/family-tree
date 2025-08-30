@@ -24,3 +24,13 @@ app.include_router(events_router)
 @app.get("/healthz")
 def health():
     return {"status": "ok", "version": settings.app_version}
+
+
+@app.get("/config")
+def get_config():
+    """Get public configuration settings"""
+    return {
+        "enable_map": settings.enable_map,
+        "google_maps_api_key": settings.google_maps_api_key,
+        "require_invite": settings.require_invite,
+    }

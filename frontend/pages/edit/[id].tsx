@@ -15,11 +15,15 @@ export default function EditMemberPage(){
   const [error,setError] = useState<string|null>(null);
   const [showInvalid, setShowInvalid] = useState(false);
   const [invalidMsgs, setInvalidMsgs] = useState<string[]>([]);
+  const [config, setConfig] = useState<any>({ enable_map: false });
 
   useEffect(()=>{
     if(!id) return;
     (async()=>{
       try{
+        const configData = await api('/config');
+        setConfig(configData);
+
         // The tree endpoint returns all members; pick the one we need
   const data = await api('/tree');
   setAllMembers(data.members || []);
@@ -113,7 +117,7 @@ export default function EditMemberPage(){
         {error && <p style={{color:'crimson'}}>{error}</p>}
         {member && (
           <>
-            <MemberEditor member={member} externalErrors={fieldErrors} onSave={onSave} requireBasics hideSubmit formId="edit-member-form" />
+            <MemberEditor member={member} externalErrors={fieldErrors} onSave={onSave} requireBasics hideSubmit formId="edit-member-form" config={config} />
             <div style={{marginTop:12}}>
               <label>Spouse
                 <select className="input" value={member.spouse_id||''} onChange={e=>setSpouse(e.target.value)}>

@@ -34,4 +34,15 @@ export function IconTrash({ size=20, title='Delete', className }: IconProps){
   );
 }
 
-export const Icons = { View: IconMagnifier, Edit: IconPencil, Delete: IconTrash };
+export function IconMap({ size=20, title='Map', className }: IconProps){
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} aria-label={title} role="img">
+      <title>{title}</title>
+      <path d="M9 20L3 17V4l6 3 6-3 6 3v13l-6-3-6 3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M9 4v16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M15 7v13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+export const Icons = { View: IconMagnifier, Edit: IconPencil, Delete: IconTrash, Map: IconMap };

@@ -72,6 +72,44 @@ uv venv --python 3.12.3
 uv sync
 ```
 
+### Google Maps Configuration (Optional)
+
+The Family Tree app includes an optional Map feature that shows family members' residence locations on an interactive map. This feature is disabled by default and requires Google Maps API setup.
+
+#### Enable Map Feature
+
+1. Set the environment variables in your `backend/.env`:
+   ```bash
+   ENABLE_MAP=true
+   GOOGLE_MAPS_API_KEY=your_actual_google_maps_api_key_here
+   ```
+
+2. Get a Google Maps API key:
+   - Go to the [Google Cloud Console](https://console.cloud.google.com/)
+   - Enable the following APIs for your project:
+     - Maps JavaScript API
+     - Geocoding API
+   - Create credentials > API key
+   - Restrict the API key to your domain(s) for security
+
+3. Restart your application to apply changes
+
+#### Map Features
+
+When enabled, the map feature provides:
+- **Navigation**: "Map" button in top navigation bar
+- **Tree Integration**: Map icons next to family members who have residence locations set
+- **Member View/Edit**: "View on Map" links next to residence location fields
+- **Interactive Map**: Shows pins for each family member with residence locations
+- **Pin Details**: Hover over pins to see full name and address
+- **Focus Mode**: Clicking map icon from tree focuses on that specific member
+
+#### Security Notes
+
+- Restrict your Google Maps API key to specific domains in production
+- Consider setting usage quotas to prevent unexpected charges
+- The Geocoding API has usage limits; monitor your usage in Google Cloud Console
+
 ### Git hooks (pre-commit / pre-push)
 
 This repo uses pre-commit for formatting/linting and a pre-push test check:

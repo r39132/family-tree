@@ -9,11 +9,15 @@ export default function ViewMemberPage(){
   const [member,setMember] = useState<any|null>(null);
   const [allMembers, setAllMembers] = useState<any[]>([]);
   const [error,setError] = useState<string|null>(null);
+  const [config, setConfig] = useState<any>({ enable_map: false });
 
   useEffect(()=>{
     if(!id) return;
     (async()=>{
       try{
+        const configData = await api('/config');
+        setConfig(configData);
+
         const data = await api('/tree');
         setAllMembers(data.members || []);
         const m = (data.members || []).find((x:any)=>x.id===id);
@@ -53,7 +57,25 @@ export default function ViewMemberPage(){
             <Field label="Last Name" value={member.last_name} />
             <Field label="Date of Birth" value={member.dob} />
             <Field label="Birth Location" value={member.birth_location} />
-            <Field label="Residence Location" value={member.residence_location} />
+            <Field
+              label="Residence Location"
+              value={
+                member.residence_location ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>{member.residence_location}</span>
+                    {config.enable_map && (
+                      <button
+                        className="btn secondary"
+                        style={{ fontSize: '12px', padding: '4px 8px' }}
+                        onClick={() => router.push(`/map?member=${member.id}`)}
+                      >
+                        View on Map
+                      </button>
+                    )}
+                  </div>
+                ) : '-'
+              }
+            />
             <Field label="Email" value={member.email} />
             <Field label="Phone" value={member.phone} />
             <Field label="Hobbies" value={(member.hobbies||[]).join(', ')} />

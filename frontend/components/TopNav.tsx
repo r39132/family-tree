@@ -15,11 +15,17 @@ type UserInfo = {
   email: string;
 };
 
+type AppConfig = {
+  enable_map: boolean;
+  require_invite: boolean;
+};
+
 export default function TopNav({ showBack=true, showAdd=true, showInvite=true, showLogout=true }: Props){
   const router = useRouter();
   const [authed, setAuthed] = useState(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [config, setConfig] = useState<AppConfig>({ enable_map: false, require_invite: true });
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(()=>{
@@ -38,6 +44,13 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
             if (err.message.includes('401')) {
               logout();
             }
+          });
+
+        // Fetch app configuration
+        api('/config')
+          .then(data => setConfig(data))
+          .catch(err => {
+            console.error('Failed to fetch config:', err);
           });
       }
     }
@@ -77,6 +90,7 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
             {showBack && <Link className="btn secondary" href="/">Family Tree</Link>}
             {showAdd && <Link className="btn secondary" href="/add">Add Member</Link>}
             <Link className="btn secondary" href="/events">Events</Link>
+            {config.enable_map && <Link className="btn secondary" href="/map">Map</Link>}
           </>
         )}
       </div>

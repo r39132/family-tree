@@ -2,7 +2,7 @@ import { useRouter } from 'next/router';
 import MemberEditor from '../components/MemberEditor';
 import TopNav from '../components/TopNav';
 import { api } from '../lib/api';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Modal from '../components/Modal';
 import TreeCacheManager from '../lib/treeCache';
 
@@ -13,6 +13,19 @@ export default function AddMemberPage(){
   const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
   const [showInvalid, setShowInvalid] = useState(false);
   const [invalidMsgs, setInvalidMsgs] = useState<string[]>([]);
+  const [config, setConfig] = useState<any>({ enable_map: false });
+
+  useEffect(() => {
+    async function loadConfig() {
+      try {
+        const configData = await api('/config');
+        setConfig(configData);
+      } catch (e) {
+        console.error('Failed to load config:', e);
+      }
+    }
+    loadConfig();
+  }, []);
 
   async function onSave(m:any){
     try{
@@ -81,7 +94,7 @@ export default function AddMemberPage(){
       <div className="card">
         <h2>Add member</h2>
         {error && <p style={{color:'crimson'}}>{error}</p>}
-  <MemberEditor member={member} externalErrors={fieldErrors} onSave={(m:any)=>{
+  <MemberEditor member={member} externalErrors={fieldErrors} config={config} onSave={(m:any)=>{
           // MemberEditor won't call onSave if invalid (button disabled), but if form submit is forced, gate it here
           // Client-side validation already runs inside MemberEditor; we can double-check minimal keys
           const errs: string[] = [];

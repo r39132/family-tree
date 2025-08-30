@@ -1,9 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-type Props = { member: any; onSave: (m:any)=>void; requireBasics?: boolean; hideSubmit?: boolean; formId?: string; externalErrors?: Record<string,string> };
+import { useRouter } from 'next/router';
 
-export default function MemberEditor({member, onSave, requireBasics=false, hideSubmit=false, formId='member-form', externalErrors = {}}: Props){
+type Props = {
+  member: any;
+  onSave: (m:any)=>void;
+  requireBasics?: boolean;
+  hideSubmit?: boolean;
+  formId?: string;
+  externalErrors?: Record<string,string>;
+  config?: any;
+};
+
+export default function MemberEditor({member, onSave, requireBasics=false, hideSubmit=false, formId='member-form', externalErrors = {}, config = {}}: Props){
   const [m,setM]=useState({...member});
   const [errors, setErrors] = useState<Record<string,string>>({});
+  const router = useRouter();
   function ch(k:string,v:any){ setM((p:any)=>({...p,[k]:v})); }
   const nameRe = useMemo(()=>/^[A-Za-z-]+$/,[]);
   const dobRe = useMemo(()=>/^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/ ,[]);
@@ -82,7 +93,28 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
   <label>Last Name <sup style={{color:'crimson'}}>*</sup><input className="input" placeholder="Last Name" value={m.last_name||''} onChange={e=>ch('last_name',e.target.value)}/>{errors.last_name && <span className="error">{errors.last_name}</span>}</label>
   <label>Date of Birth (MM/DD/YYYY) <sup style={{color:'crimson'}}>*</sup><input className="input" placeholder="MM/DD/YYYY" value={m.dob||''} onChange={e=>ch('dob', fmtDob(e.target.value))}/>{errors.dob && <span className="error">{errors.dob}</span>}</label>
     <label>Birth Location<input className="input" placeholder="Birth Location" value={m.birth_location||''} onChange={e=>ch('birth_location',e.target.value)}/></label>
-    <label>Residence Location<input className="input" placeholder="Residence Location" value={m.residence_location||''} onChange={e=>ch('residence_location',e.target.value)}/></label>
+    <label>
+      Residence Location
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+        <input
+          className="input"
+          style={{ flex: 1 }}
+          placeholder="Residence Location"
+          value={m.residence_location||''}
+          onChange={e=>ch('residence_location',e.target.value)}
+        />
+        {config.enable_map && m.residence_location && (
+          <button
+            type="button"
+            className="btn secondary"
+            style={{ fontSize: '12px', padding: '4px 8px', whiteSpace: 'nowrap' }}
+            onClick={() => router.push(`/map?member=${member.id}`)}
+          >
+            View on Map
+          </button>
+        )}
+      </div>
+    </label>
   <label>Email<input className="input" type="email" placeholder="Email" value={m.email||''} onChange={e=>ch('email',e.target.value)}/>{errors.email && <span className="error">{errors.email}</span>}</label>
     <label>Phone<input className="input" placeholder="Phone" value={m.phone||''} onChange={e=>ch('phone',e.target.value)}/></label>
   <label>Hobbies (comma-separated)<input className="input" placeholder="e.g., Reading, Hiking" value={(m.hobbies||[]).join(', ')} onChange={e=>ch('hobbies', e.target.value.split(',').map((s:string)=>s.trim()).filter(Boolean))}/></label>

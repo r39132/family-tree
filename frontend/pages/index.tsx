@@ -18,6 +18,7 @@ export default function Home(){
   const [versions, setVersions] = useState<any[]>([]);
   const [recoverId, setRecoverId] = useState<string>('');
   const [showCacheStats, setShowCacheStats] = useState(false);
+  const [config, setConfig] = useState<any>({ enable_map: false });
 
   function fmtVersionLabel(iso?: string, _count?: number, version?: number){
     if(!iso) return '';
@@ -37,6 +38,10 @@ export default function Home(){
   async function load(){
     try{
       const cacheManager = TreeCacheManager.getInstance();
+
+      // Load config
+      const configData = await api('/config');
+      setConfig(configData);
 
       // Try to get cached tree data first
       const cachedTree = cacheManager.getCachedTree();
@@ -160,7 +165,7 @@ export default function Home(){
   function Node({n}:{n:any}){
     const m = n.member;
     const s = n.spouse;
-  const { View, Edit, Delete } = Icons;
+  const { View, Edit, Delete, Map } = Icons;
     const nameEl = (x:any)=>{
       const deceased = !!x?.is_deceased;
       const style = deceased ? {color:'crimson'} : {};
@@ -180,12 +185,18 @@ export default function Home(){
         <div className="nav" style={{gap:8}}>
           <button className="btn secondary" title={`View ${m.first_name}`} onClick={()=>router.push(`/view/${m.id}`)}><View /></button>
           <button className="btn secondary" title={`Edit ${m.first_name}`} onClick={()=>router.push(`/edit/${m.id}`)}><Edit /></button>
+          {config.enable_map && m.residence_location && (
+            <button className="btn secondary" title={`View ${m.first_name} on map`} onClick={()=>router.push(`/map?member=${m.id}`)}><Map /></button>
+          )}
           <button className="btn" title={`Delete ${m.first_name}`} onClick={()=>remove(m.id)}><Delete /></button>
           {s && (<span className="vsep" />)}
           {s && (
             <>
               <button className="btn secondary" title={`View ${s.first_name}`} onClick={()=>router.push(`/view/${s.id}`)}><View /></button>
               <button className="btn secondary" title={`Edit ${s.first_name}`} onClick={()=>router.push(`/edit/${s.id}`)}><Edit /></button>
+              {config.enable_map && s.residence_location && (
+                <button className="btn secondary" title={`View ${s.first_name} on map`} onClick={()=>router.push(`/map?member=${s.id}`)}><Map /></button>
+              )}
               <button className="btn" title={`Delete ${s.first_name}`} onClick={()=>remove(s.id)}><Delete /></button>
             </>
           )}

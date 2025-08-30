@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     use_email_in_dev: bool = Field(default=True, alias="USE_EMAIL_IN_DEV")
 
     require_invite: bool = Field(default=True, alias="REQUIRE_INVITE")
+    enable_map: bool = Field(default=False, alias="ENABLE_MAP")
+    google_maps_api_key: str = Field(default="", alias="GOOGLE_MAPS_API_KEY")
 
     class Config:
         env_file = ".env"

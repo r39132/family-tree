@@ -121,7 +121,7 @@ export default function EventsPage() {
                       <td>
                         {event.event_type === 'birthday'
                           ? `${event.age_on_date} years old`
-                          : `${event.age_on_date} years ago`
+                          : `Would be ${event.age_on_date} years old`
                         }
                       </td>
                     </tr>
@@ -158,7 +158,7 @@ export default function EventsPage() {
                       <td>
                         {event.event_type === 'birthday'
                           ? `Turned ${event.age_on_date}`
-                          : `${event.age_on_date} years ago`
+                          : `Would be ${event.age_on_date} years old`
                         }
                       </td>
                     </tr>
@@ -241,7 +241,7 @@ export default function EventsPage() {
                         <span className="event-age">
                           {event.event_type === 'birthday'
                             ? (isPast ? `Turned ${event.age_on_date}` : `Turning ${event.age_on_date}`)
-                            : `${event.age_on_date} years ago`
+                            : `Would be ${event.age_on_date} years old`
                           }
                         </span>
                         {isPast && <span className="past-indicator">Past</span>}
