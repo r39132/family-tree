@@ -126,10 +126,13 @@ jobs:
       - name: Build & push image (optional)
         if: ${{ inputs.build_image != false }}
         run: |
-          IMAGE=${{ secrets.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/family-tree/family-tree-api:$(git rev-parse --short HEAD)
-          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
-          docker build -t "$IMAGE" .
-          docker push "$IMAGE"
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          IMAGE_SHA=${{ secrets.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/family-tree/family-tree-api:${SHORT_SHA}
+          IMAGE_MAIN=${{ secrets.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/family-tree/family-tree-api:main
+          echo "IMAGE=$IMAGE_SHA" >> $GITHUB_ENV
+          docker build -t "$IMAGE_SHA" -t "$IMAGE_MAIN" .
+          docker push "$IMAGE_SHA"
+          docker push "$IMAGE_MAIN"
 
       - name: Use existing image if not building
         if: ${{ inputs.build_image == false }}
