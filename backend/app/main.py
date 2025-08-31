@@ -26,6 +26,12 @@ def health():
     return {"status": "ok", "version": settings.app_version}
 
 
+@app.options("/{path:path}")
+def options_handler():
+    """Explicit OPTIONS handler for all paths to ensure CORS preflight works"""
+    return {}
+
+
 @app.get("/config")
 def get_config():
     """Get public configuration settings"""
