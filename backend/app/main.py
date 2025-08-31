@@ -11,6 +11,9 @@ app = FastAPI(title=settings.app_name, version=settings.app_version)
 # CORS: allow front-end origins and enable credentials.
 # Keep explicit local dev origins; use a regex for Cloud Run web URLs.
 ALLOWED_ORIGINS = [
+    # Prod Cloud Run web URLs (explicit)
+    "https://family-tree-web-153553106247.us-central1.run.app",
+    "https://family-tree-web-klif7ymw3q-uc.a.run.app",
     # Local dev (Next.js)
     "http://localhost:3000",
     "http://127.0.0.1:3000",
