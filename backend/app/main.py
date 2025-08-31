@@ -27,7 +27,7 @@ app.include_router(events_router)
 
 @app.get("/healthz")
 def health():
-    return {"status": "ok", "version": settings.app_version}
+    return {"status": "ok", "version": settings.app_version, "cors_enabled": True}
 
 
 @app.get("/config")
