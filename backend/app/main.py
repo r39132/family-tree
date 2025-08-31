@@ -16,6 +16,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.options("/{path:path}")
+def options_handler():
+    """Explicit OPTIONS handler for all paths to ensure CORS preflight works"""
+    return {}
+
+
 app.include_router(auth_router)
 app.include_router(tree_router)
 app.include_router(events_router)
@@ -24,12 +31,6 @@ app.include_router(events_router)
 @app.get("/healthz")
 def health():
     return {"status": "ok", "version": settings.app_version}
-
-
-@app.options("/{path:path}")
-def options_handler():
-    """Explicit OPTIONS handler for all paths to ensure CORS preflight works"""
-    return {}
 
 
 @app.get("/config")
