@@ -10,17 +10,15 @@ app = FastAPI(title=settings.app_name, version=settings.app_version)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins temporarily for debugging
-    allow_credentials=False,  # Must be False when using allow_origins=["*"]
-    allow_methods=["*"],
+    allow_origins=[
+        "https://family-tree-web-klif7ymw3q-uc.a.run.app",
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ],
+    allow_credentials=True,  # Can be True with specific origins
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
-
-
-@app.options("/{path:path}")
-def options_handler():
-    """Explicit OPTIONS handler for all paths to ensure CORS preflight works"""
-    return {}
 
 
 app.include_router(auth_router)
