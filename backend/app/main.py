@@ -10,7 +10,11 @@ app = FastAPI(title=settings.app_name, version=settings.app_version)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",  # Local development
+        "http://localhost:3001",  # Alternative local port
+        "https://family-tree-web-klif7ymw3q-uc.a.run.app",  # Deployed frontend
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
