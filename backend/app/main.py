@@ -12,12 +12,18 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://family-tree-web-klif7ymw3q-uc.a.run.app",
+        "https://family-tree-web-153553106247.us-central1.run.app",
         "http://localhost:3000",
         "http://localhost:3001",
     ],
+    # Accept either Cloud Run URL shape for the frontend (hash .a.run.app or projectid .us-central1.run.app)
+    allow_origin_regex=r"^https://family-tree-web-(?:[a-z0-9\-]+\.a\.run\.app|\d+\.us-central1\.run\.app)$",
     allow_credentials=True,  # Can be True with specific origins
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
+    # Optional but harmless: expose headers and cache preflight
+    expose_headers=["*"],
+    max_age=600,
 )
 
 
