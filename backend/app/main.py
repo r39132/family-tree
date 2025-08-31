@@ -16,8 +16,19 @@ app.add_middleware(
         "https://family-tree-web-klif7ymw3q-uc.a.run.app",  # Deployed frontend
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+    allow_headers=[
+        "Accept",
+        "Accept-Language",
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Origin",
+        "Referer",
+        "User-Agent",
+    ],
+    expose_headers=["*"],
 )
 
 app.include_router(auth_router)
@@ -27,7 +38,7 @@ app.include_router(events_router)
 
 @app.get("/healthz")
 def health():
-    return {"status": "ok", "version": settings.app_version, "cors_enabled": True}
+    return {"status": "ok", "version": settings.app_version}
 
 
 @app.get("/config")
