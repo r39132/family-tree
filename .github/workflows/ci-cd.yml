@@ -155,3 +155,78 @@ jobs:
             --region ${{ secrets.CLOUD_RUN_REGION }} \
             --format='value(status.url)')
           echo "Service is live at: $URL"
+
+  frontend-deploy:
+    needs: backend-deploy
+    runs-on: ubuntu-latest
+    if: >
+      ${{
+        (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        || github.event_name == 'workflow_dispatch'
+      }}
+    defaults:
+      run:
+        working-directory: frontend
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || 'main' }}
+
+      - name: Google Cloud auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Docker auth for Artifact Registry
+        run: gcloud auth configure-docker ${{ secrets.GAR_LOCATION }}-docker.pkg.dev
+
+      - name: Get backend URL
+        run: |
+          BACKEND_URL=$(gcloud run services describe ${{ secrets.CLOUD_RUN_SERVICE }} \
+            --region ${{ secrets.CLOUD_RUN_REGION }} \
+            --format='value(status.url)')
+          echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+
+      - name: Build & push frontend image
+        if: ${{ inputs.build_image != false }}
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          FRONTEND_IMAGE_SHA=${{ secrets.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/family-tree/family-tree-web:${SHORT_SHA}
+          FRONTEND_IMAGE_MAIN=${{ secrets.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/family-tree/family-tree-web:main
+          echo "FRONTEND_IMAGE=$FRONTEND_IMAGE_SHA" >> $GITHUB_ENV
+          docker build \
+            --build-arg NEXT_PUBLIC_API_BASE="$BACKEND_URL" \
+            -t "$FRONTEND_IMAGE_SHA" \
+            -t "$FRONTEND_IMAGE_MAIN" \
+            .
+          docker push "$FRONTEND_IMAGE_SHA"
+          docker push "$FRONTEND_IMAGE_MAIN"
+
+      - name: Use existing frontend image if not building
+        if: ${{ inputs.build_image == false }}
+        run: |
+          FRONTEND_IMAGE=${{ secrets.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/family-tree/family-tree-web:main
+          echo "FRONTEND_IMAGE=$FRONTEND_IMAGE" >> $GITHUB_ENV
+
+      - name: Deploy frontend to Cloud Run
+        run: |
+          gcloud run deploy family-tree-web \
+            --image "$FRONTEND_IMAGE" \
+            --region ${{ secrets.CLOUD_RUN_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 3000
+
+      - name: Print Frontend Cloud Run URL
+        run: |
+          FRONTEND_URL=$(gcloud run services describe family-tree-web \
+            --region ${{ secrets.CLOUD_RUN_REGION }} \
+            --format='value(status.url)')
+          echo "Frontend is live at: $FRONTEND_URL"
