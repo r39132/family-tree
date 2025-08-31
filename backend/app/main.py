@@ -8,24 +8,21 @@ from .routes_tree import router as tree_router
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
 
-# CORS: allow specific front-end origins and enable credentials.
-# - Explicit localhost entries
-# - Regex to match Cloud Run service URLs in both formats:
-#   - https://family-tree-web-<hash>-uc.a.run.app
-#   - https://family-tree-web-<projectNumber>.us-central1.run.app
+# CORS: allow front-end origins and enable credentials.
+# Keep explicit local dev origins; use a regex for Cloud Run web URLs.
 ALLOWED_ORIGINS = [
+    # Local dev (Next.js)
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    # Local dev (Vite)
+    "http://localhost:5173",
 ]
-
-ALLOW_ORIGIN_REGEX = (
-    r"^https://family-tree-web-(?:[a-z0-9\-]+-uc\.a\.run\.app|[0-9]+\.us-central1\.run\.app)$"
-)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=ALLOW_ORIGIN_REGEX,
+    # Allow Cloud Run frontend URLs like: https://family-tree-web-<hash>-uc.a.run.app
+    allow_origin_regex=r"^https://family-tree-web-[a-z0-9-]+-uc\.a\.run\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
