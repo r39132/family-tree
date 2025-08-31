@@ -8,15 +8,23 @@ from .routes_tree import router as tree_router
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
 
-"""Enable CORS for all origins, methods, and headers.
-Note: Credentials (cookies) are not allowed when using wildcard origins.
-"""
+# CORS: allow specific front-end origins and enable credentials
+ALLOWED_ORIGINS = [
+    # Cloud Run web service URLs (include both styles if used)
+    "https://family-tree-web-153553106247.us-central1.run.app",
+    "https://family-tree-web-klif7ymw3q-uc.a.run.app",
+    # Local dev (Next.js)
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_credentials=False,
+    max_age=600,
 )
 
 app.include_router(auth_router)
