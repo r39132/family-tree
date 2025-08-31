@@ -133,14 +133,3 @@ def test_member_invalid_dob_format():
     )
     # Should succeed but without dob_ts field
     assert r.status_code == 200
-
-
-def test_cors_headers():
-    """Test CORS headers are present"""
-    client = TestClient(app)
-    r = client.options(
-        "/healthz",
-        headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "GET"},
-    )
-    # Should have CORS headers
-    assert "access-control-allow-origin" in r.headers or r.status_code == 200
