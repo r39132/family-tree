@@ -29,3 +29,18 @@ export async function api(path: string, opts: RequestInit = {}){
   }
   return res.json();
 }
+
+// Public API function for endpoints that don't require authentication
+export async function publicApi(path: string, opts: RequestInit = {}){
+  const headers = new Headers(opts.headers || {});
+  headers.set('Content-Type','application/json');
+  // No authorization header for public endpoints
+
+  const res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
+
+  if(!res.ok){
+    const t = await res.text();
+    throw new Error(`${res.status}: ${t}`);
+  }
+  return res.json();
+}

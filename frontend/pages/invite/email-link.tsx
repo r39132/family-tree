@@ -1,7 +1,7 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import TopNav from '../../components/TopNav';
-import { api } from '../../lib/api';
+import { publicApi } from '../../lib/api';
 
 export default function EmailInviteLink(){
   const router = useRouter();
@@ -20,7 +20,7 @@ export default function EmailInviteLink(){
     setError(undefined);
     if(!email.trim()) { setError('Email is required'); return; }
     try{
-      await api(`/auth/invites/${encodeURIComponent(String(code))}/email`, { method:'POST', body: JSON.stringify({ email }) });
+      await publicApi(`/auth/public/invites/${encodeURIComponent(String(code))}/email`, { method:'POST', body: JSON.stringify({ email }) });
       setOk(true);
       setTimeout(()=>{ router.push('/invite'); }, 800);
     }catch(e:any){ setError(e?.message || 'Failed to send email'); }

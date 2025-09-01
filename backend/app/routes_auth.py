@@ -186,7 +186,7 @@ def list_invites(view: str = "all", current_user: str = Depends(get_current_user
 
 @router.post("/invites/{code}/email")
 def email_invite_link(code: str, payload: dict, current_user: str = Depends(get_current_username)):
-    """Send a registration link via email for an unredeemed invite token."""
+    """Send a registration link via email for an unredeemed invite token (authenticated version)."""
     to_email = payload.get("email")
     if not to_email:
         raise HTTPException(status_code=400, detail="email is required")
@@ -198,6 +198,54 @@ def email_invite_link(code: str, payload: dict, current_user: str = Depends(get_
     data = doc.to_dict() or {}
     if not data.get("active", False):
         raise HTTPException(status_code=400, detail="Invite has already been redeemed")
+    register_link = f"{'http://localhost:3000'}/register?invite={code}"
+    body = (
+        "You're invited to join Family Tree!\n\n"
+        f"Use this link to register: {register_link}\n\n"
+        "If you didn't expect this, you can ignore this email."
+    )
+    send_mail(to_email, "Your Family Tree invitation", body)
+    # Record that an invite email was sent
+    ref.update(
+        {
+            "sent_email": to_email,
+            "sent_at": firestore.SERVER_TIMESTAMP,
+        }
+    )
+    return {"ok": True, "sent_email": to_email}
+
+
+@router.post("/public/invites/{code}/email")
+def public_email_invite_link(code: str, payload: dict):
+    """Send a registration link via email for an unredeemed invite token (public version)."""
+    to_email = payload.get("email")
+    if not to_email:
+        raise HTTPException(status_code=400, detail="email is required")
+    db = get_db()
+    ref = db.collection("invites").document(code)
+    doc = ref.get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    data = doc.to_dict() or {}
+    if not data.get("active", False):
+        raise HTTPException(status_code=400, detail="Invite has already been redeemed")
+
+    # Basic rate limiting: check if email was sent recently (within last hour)
+    sent_at = data.get("sent_at")
+    if sent_at:
+        from datetime import datetime, timedelta, timezone
+
+        # Convert Firestore timestamp to datetime
+        if hasattr(sent_at, "seconds"):
+            sent_datetime = datetime.fromtimestamp(sent_at.seconds, tz=timezone.utc)
+        else:
+            sent_datetime = sent_at
+
+        if datetime.now(tz=timezone.utc) - sent_datetime < timedelta(hours=1):
+            raise HTTPException(
+                status_code=429, detail="Email was sent recently. Please wait before sending again."
+            )
+
     register_link = f"{'http://localhost:3000'}/register?invite={code}"
     body = (
         "You're invited to join Family Tree!\n\n"
