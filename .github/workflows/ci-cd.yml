@@ -123,8 +123,20 @@ jobs:
       - name: Docker auth for Artifact Registry
         run: gcloud auth configure-docker ${{ secrets.GAR_LOCATION }}-docker.pkg.dev
 
-      - name: Build & push image (optional)
-        if: ${{ inputs.build_image != false }}
+      - name: Check for code changes
+        id: changes
+        run: |
+          # Check if this push contains changes to backend code or dockerfile
+          if git diff --name-only HEAD^ HEAD | grep -E '^(backend/|\.github/workflows/)' > /dev/null; then
+            echo "code_changed=true" >> $GITHUB_OUTPUT
+            echo "Code changes detected in backend/ or workflows/"
+          else
+            echo "code_changed=false" >> $GITHUB_OUTPUT
+            echo "No code changes detected"
+          fi
+
+      - name: Build & push image (auto for code changes)
+        if: ${{ steps.changes.outputs.code_changed == 'true' || inputs.build_image == true }}
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
           IMAGE_SHA=${{ secrets.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/family-tree/family-tree-api:${SHORT_SHA}
@@ -135,7 +147,7 @@ jobs:
           docker push "$IMAGE_MAIN"
 
       - name: Use existing image if not building
-        if: ${{ inputs.build_image == false }}
+        if: ${{ steps.changes.outputs.code_changed == 'false' && inputs.build_image != true }}
         run: |
           IMAGE=${{ secrets.GAR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/family-tree/family-tree-api:main
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
