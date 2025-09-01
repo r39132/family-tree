@@ -57,8 +57,8 @@ jobs:
       - name: Run tests with coverage (from backend/)
         working-directory: backend
         run: |
-          # adjust --cov target if your package name differs
-          uv run pytest -q --cov=app --cov-report=xml
+          # Run tests with coverage requirement (50% minimum)
+          uv run pytest -q --cov=app --cov-report=xml --cov-fail-under=50
           test -f coverage.xml
           echo "Coverage report generated successfully"
 
