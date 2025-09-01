@@ -19,7 +19,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       if (typeof window === 'undefined') return;
 
       const token = localStorage.getItem('token');
@@ -34,8 +34,31 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (token) {
-        setIsAuthenticated(true);
+      if (token && !isPublicRoute) {
+        // For protected routes, validate the token by making a test API call
+        try {
+          const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8080";
+          const response = await fetch(`${API_BASE}/auth/me`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (!response.ok) {
+            // Token is invalid, remove it and redirect to login
+            localStorage.removeItem('token');
+            router.replace('/login');
+            return;
+          }
+
+          setIsAuthenticated(true);
+        } catch (error) {
+          // Network error or invalid token - redirect to login
+          localStorage.removeItem('token');
+          router.replace('/login');
+          return;
+        }
       }
 
       setIsLoading(false);

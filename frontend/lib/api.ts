@@ -19,10 +19,10 @@ export async function api(path: string, opts: RequestInit = {}){
   if(!res.ok){
     const t = await res.text();
 
-    // Handle 401 unauthorized - automatically logout
-    if (res.status === 401) {
+    // Handle 401 and 403 unauthorized - automatically logout
+    if (res.status === 401 || res.status === 403) {
       handleLogout();
-      throw new Error(`401: Authentication required`);
+      throw new Error(`${res.status}: Authentication required`);
     }
 
     throw new Error(`${res.status}: ${t}`);
