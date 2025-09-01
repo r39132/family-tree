@@ -48,6 +48,7 @@ def health():
     """Health check endpoint with build and git information"""
     return {
         "status": "ok",
+        "version": settings.app_version,
         "message": "Health endpoint is working!",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
