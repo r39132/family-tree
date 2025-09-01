@@ -1,5 +1,3 @@
-import os
-import subprocess
 from datetime import datetime, timezone
 
 from fastapi import FastAPI
@@ -48,42 +46,10 @@ app.include_router(events_router)
 @app.get("/healthz")
 def health():
     """Health check endpoint with build and git information"""
-    # Get git commit info
-    commit_sha = "unknown"
-    commit_time = "unknown"
-    try:
-        # Get current commit SHA
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            capture_output=True,
-            text=True,
-            cwd=os.path.dirname(os.path.dirname(__file__)),
-        )
-        if result.returncode == 0:
-            commit_sha = result.stdout.strip()[:8]  # Short SHA
-
-        # Get commit timestamp
-        result = subprocess.run(
-            ["git", "show", "-s", "--format=%ci", "HEAD"],
-            capture_output=True,
-            text=True,
-            cwd=os.path.dirname(os.path.dirname(__file__)),
-        )
-        if result.returncode == 0:
-            commit_time = result.stdout.strip()
-    except Exception:
-        pass  # Keep defaults if git commands fail
-
     return {
         "status": "ok",
-        "version": settings.app_version,
+        "message": "Health endpoint is working!",
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "git": {"commit": commit_sha, "commit_time": commit_time},
-        "environment": {
-            "debug": settings.debug,
-            "enable_map": settings.enable_map,
-            "require_invite": settings.require_invite,
-        },
     }
 
 
