@@ -10,7 +10,11 @@ from .routes_auth import router as auth_router
 from .routes_events import router as events_router
 from .routes_tree import router as tree_router
 
-app = FastAPI(title=settings.app_name, version=settings.app_version)
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    description="Family Tree API with health monitoring",
+)
 
 # CORS: allow front-end origins and enable credentials.
 # Keep explicit local dev origins; use a regex for Cloud Run web URLs.
