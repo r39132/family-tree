@@ -136,4 +136,4 @@ For commercial use, closed-source derivatives, or applications where AGPLv3 requ
 - Freedom to create proprietary derivatives
 - Commercial support and customization available
 
-For commercial licensing inquiries, open a pull request.
+For commercial licensing inquiries, please contact: [your-email@example.com]
