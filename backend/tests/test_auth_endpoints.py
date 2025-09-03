@@ -230,3 +230,65 @@ def test_test_email_endpoint():
     r = client.post("/auth/test-email?to=test@example.com")
     assert r.status_code == 200
     assert r.json()["ok"] is True
+
+
+def test_delete_invite_requires_auth():
+    """Test that deleting an invite requires authentication"""
+    client = TestClient(app)
+
+    # Override to remove auth
+    app.dependency_overrides.pop(get_current_username, None)
+
+    response = client.delete("/auth/invites/test-code")
+    assert response.status_code in (401, 403)
+
+    # Restore auth
+    app.dependency_overrides[get_current_username] = lambda: "tester"
+
+
+def test_delete_nonexistent_invite():
+    """Test deleting a non-existent invite returns 404"""
+    client = TestClient(app)
+
+    response = client.delete(
+        "/auth/invites/nonexistent-code", headers={"Authorization": "Bearer x"}
+    )
+    assert response.status_code == 404
+    assert "Invite not found" in response.json()["detail"]
+
+
+def test_delete_active_invite_success():
+    """Test successfully deleting an active invite"""
+    client = TestClient(app)
+
+    # Create an active invite
+    fake_db.collection("invites").document("test-code").set(
+        {"active": True, "created_by": "tester", "created_at": "2023-01-01"}
+    )
+
+    response = client.delete("/auth/invites/test-code", headers={"Authorization": "Bearer x"})
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    assert "deleted successfully" in response.json()["message"]
+
+    # Verify invite was deleted
+    doc = fake_db.collection("invites").document("test-code").get()
+    assert not doc.exists
+
+
+def test_delete_redeemed_invite_fails():
+    """Test that deleting a redeemed invite fails"""
+    client = TestClient(app)
+
+    # Create a redeemed invite
+    fake_db.collection("invites").document("redeemed-code").set(
+        {"active": False, "created_by": "tester", "used_by": "someuser", "used_at": "2023-01-02"}
+    )
+
+    response = client.delete("/auth/invites/redeemed-code", headers={"Authorization": "Bearer x"})
+    assert response.status_code == 400
+    assert "Cannot delete redeemed invite" in response.json()["detail"]
+
+    # Verify invite was NOT deleted
+    doc = fake_db.collection("invites").document("redeemed-code").get()
+    assert doc.exists

@@ -143,7 +143,7 @@ jobs:
             --region ${{ secrets.CLOUD_RUN_REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }},FIRESTORE_DATABASE=family-tree,ENABLE_MAP=${{ secrets.ENABLE_MAP || 'false' }},GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY || '' }}"
+            --set-env-vars "GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }},FIRESTORE_DATABASE=family-tree,ENABLE_MAP=${{ secrets.ENABLE_MAP || 'false' }},GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY || '' }},SMTP_HOST=${{ secrets.SMTP_HOST }},SMTP_PORT=${{ secrets.SMTP_PORT || '587' }},SMTP_USER=${{ secrets.SMTP_USER }},SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }},EMAIL_FROM=${{ secrets.EMAIL_FROM }},EMAIL_FROM_NAME=${{ secrets.EMAIL_FROM_NAME }},USE_EMAIL_IN_DEV=true"
 
       - name: Print Cloud Run URL
         run: |

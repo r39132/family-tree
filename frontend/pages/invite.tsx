@@ -22,6 +22,40 @@ export default function Invite(){
   const [invites, setInvites] = useState<InviteItem[]>([]);
   const [justCreated, setJustCreated] = useState<string[]>([]);
 
+  // Helper function to format dates in user-friendly format
+  const formatDate = (dateValue: any): string => {
+    if (!dateValue) return '';
+
+    try {
+      let date: Date;
+
+      // Handle Firestore timestamp format or ISO string
+      if (typeof dateValue === 'object' && dateValue.seconds) {
+        // Firestore timestamp format
+        date = new Date(dateValue.seconds * 1000);
+      } else if (typeof dateValue === 'string') {
+        date = new Date(dateValue);
+      } else {
+        date = new Date(dateValue);
+      }
+
+      // Check if date is valid
+      if (isNaN(date.getTime())) return String(dateValue);
+
+      // Format in user's local timezone
+      return date.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch {
+      return String(dateValue);
+    }
+  };
+
   async function loadInvites(v: 'all'|'redeemed'|'available'|'invite-sent' = view){
     try{
       const res = await api(`/auth/invites?view=${v}`);
@@ -54,6 +88,40 @@ export default function Invite(){
         return;
       }
       setError(msg || 'Failed to generate invites');
+    }
+  }
+
+  async function deleteInvite(code: string){
+    if (!confirm(`Are you sure you want to delete invite ${code}? This cannot be undone.`)) {
+      return;
+    }
+
+    try{
+      await api(`/auth/invites/${encodeURIComponent(code)}`, { method: 'DELETE' });
+      await loadInvites(view); // Refresh the current view
+      setError(undefined);
+    }catch(e:any){
+      const msg = e?.message || '';
+      setError(msg || 'Failed to delete invite');
+    }
+  }
+
+  async function resendInvite(code: string, email: string){
+    if (!email) {
+      setError('No email address found for this invite');
+      return;
+    }
+
+    try{
+      await api(`/auth/invites/${encodeURIComponent(code)}/email`, {
+        method: 'POST',
+        body: JSON.stringify({ email })
+      });
+      await loadInvites(view); // Refresh to show updated sent_at time
+      setError(undefined);
+    }catch(e:any){
+      const msg = e?.message || '';
+      setError(msg || 'Failed to resend invite');
     }
   }
 
@@ -135,9 +203,9 @@ export default function Invite(){
             <thead>
               <tr>
                 <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Token</th>
-                <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Redeemer Email</th>
-                <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Redeemer Username</th>
-                <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Redeemed At</th>
+                <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Email</th>
+                <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Username</th>
+                <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Date</th>
                 <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Status</th>
                 <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Actions</th>
               </tr>
@@ -145,18 +213,72 @@ export default function Invite(){
             <tbody>
               {filtered.map(row=>{
                 const st = getStatus(row);
-                const dateStr = row.used_at ? String(row.used_at) : '';
+                // Show different dates based on status
+                let dateToShow = '';
+                if (st === 'redeemed' && row.used_at) {
+                  dateToShow = formatDate(row.used_at);
+                } else if (st === 'invite-sent' && row.sent_at) {
+                  dateToShow = formatDate(row.sent_at);
+                }
+
                 const status = st === 'redeemed' ? 'Redeemed' : (st === 'invite-sent' ? 'Invite Sent' : 'Available');
                 return (
                   <tr key={row.code}>
                     <td style={{padding:'8px'}}><code>{row.code}</code></td>
                     <td style={{padding:'8px'}}>{row.used_email || row.sent_email || ''}</td>
                     <td style={{padding:'8px'}}>{row.used_by || ''}</td>
-                    <td style={{padding:'8px'}}>{dateStr}</td>
+                    <td style={{padding:'8px'}}>{dateToShow}</td>
                     <td style={{padding:'8px'}}>{status}</td>
                     <td style={{padding:'8px'}}>
                       {st === 'available' && (
-                        <Link href={`/invite/email-link?code=${encodeURIComponent(row.code)}`}>Email Registration Link</Link>
+                        <>
+                          <Link href={`/invite/email-link?code=${encodeURIComponent(row.code)}`}>Email Registration Link</Link>
+                          <span style={{margin: '0 8px'}}>|</span>
+                          <button
+                            onClick={() => deleteInvite(row.code)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#dc2626',
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                              fontSize: 'inherit'
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                      {st === 'invite-sent' && (
+                        <>
+                          <button
+                            onClick={() => resendInvite(row.code, row.sent_email || '')}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#2563eb',
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                              fontSize: 'inherit'
+                            }}
+                          >
+                            Resend
+                          </button>
+                          <span style={{margin: '0 8px'}}>|</span>
+                          <button
+                            onClick={() => deleteInvite(row.code)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#dc2626',
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                              fontSize: 'inherit'
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>

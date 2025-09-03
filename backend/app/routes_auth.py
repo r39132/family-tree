@@ -184,6 +184,25 @@ def list_invites(view: str = "all", current_user: str = Depends(get_current_user
     return {"ok": True, "invites": items}
 
 
+@router.delete("/invites/{code}")
+def delete_invite(code: str, current_user: str = Depends(get_current_username)):
+    """Delete an unredeemed invite token."""
+    db = get_db()
+    ref = db.collection("invites").document(code)
+    doc = ref.get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Invite not found")
+
+    data = doc.to_dict() or {}
+    # Prevent deletion of redeemed invites
+    if not data.get("active", False):
+        raise HTTPException(status_code=400, detail="Cannot delete redeemed invite")
+
+    # Delete the invite document
+    ref.delete()
+    return {"ok": True, "message": "Invite deleted successfully"}
+
+
 @router.post("/invites/{code}/email")
 def email_invite_link(code: str, payload: dict, current_user: str = Depends(get_current_username)):
     """Send a registration link via email for an unredeemed invite token (authenticated version)."""
