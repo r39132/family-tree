@@ -23,6 +23,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validate JSON files
+        run: |
+          find . -name "*.json" -exec python -m json.tool {} \; > /dev/null
+          echo "✅ All JSON files are valid"
+
       - name: Quick CI sanity check
         run: echo "CI ran on $GITHUB_SHA"
 

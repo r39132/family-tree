@@ -15,9 +15,10 @@
 A full‑stack **Family Tree** application with modern web technologies, designed for local development and cloud deployment.
 
 **Tech Stack:**
-- **Frontend:** Next.js (TypeScript) with nature‑themed UI
+- **Frontend:** Next.js (TypeScript) with ESLint and nature‑themed UI
 - **Backend:** FastAPI (Python 3.12.3) with JWT authentication
 - **Database:** Google Firestore
+- **Development:** Pre-commit hooks, syntax validation, automated testing
 - **Deployment:** Docker + GitHub Actions CI/CD to Google Cloud Run
 
 ## Features
@@ -26,6 +27,7 @@ A full‑stack **Family Tree** application with modern web technologies, designe
 - **Family Tree:** Visual tree with CRUD operations, member relationships
 - **Map Integration:** Optional Google Maps integration for member locations
 - **Quality Assurance:** Comprehensive testing, linting, and code formatting
+- **Development Tools:** Pre-commit hooks, syntax validation, and automated checks
 - **Cloud Ready:** Production deployment to Google Cloud Run
 
 ## Quick Start
@@ -56,27 +58,38 @@ A full‑stack **Family Tree** application with modern web technologies, designe
 
 ### Development
 
-1. **Setup Python environment:**
+1. **Setup development tools (recommended first step):**
+   ```bash
+   ./setup-dev-tools.sh
+   ```
+   This installs pre-commit hooks for:
+   - JSON/YAML syntax validation
+   - Python code formatting (Black, Ruff)
+   - TypeScript type checking
+   - ESLint for frontend code quality
+   - Automated tests on push
+
+2. **Setup Python environment:**
    ```bash
    cd backend
    uv venv --python 3.12.3
    uv sync
    ```
 
-2. **Run backend:**
+3. **Run backend:**
    ```bash
    cd backend
    uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
    ```
 
-3. **Run frontend:**
+4. **Run frontend:**
    ```bash
    cd frontend
    npm install
    npm run dev
    ```
 
-4. **Access application:** http://localhost:3000
+5. **Access application:** http://localhost:3000
 
 ### Docker Compose (Alternative)
 
@@ -86,33 +99,62 @@ docker compose up --build
 
 ## Testing
 
+### Backend Tests
 ```bash
 cd backend
 uv run pytest --cov=app
 ```
 
+### Frontend Tests
+```bash
+cd frontend
+npm test
+```
+
+### Syntax and Code Quality Checks
+```bash
+# Run all pre-commit hooks manually
+pre-commit run --all-files
+
+# Frontend specific checks
+cd frontend
+npm run lint        # ESLint checks
+npm run type-check  # TypeScript validation
+
+# Backend specific checks
+cd backend
+uv run ruff check   # Python linting
+uv run black --check .  # Code formatting check
+```
+
 ## Deployment
 
-The project includes GitHub Actions workflow for automatic deployment to Google Cloud Run. See [CI/CD documentation](docs/ARCHITECTURE.md) for setup details.
+The project includes GitHub Actions workflow for automatic deployment to Google Cloud Run. See [Deployment Guide](docs/DEPLOYMENT.md) for complete setup details and troubleshooting.
 
 ## Documentation
 
 - **[Architecture Overview](docs/ARCHITECTURE.md)** - Technical architecture, data flow, and sequence diagrams
 - **[Screenshots](docs/SCREENSHOTS.md)** - Application screenshots and UI examples
+- **[Contributing Guide](docs/CONTRIBUTING.md)** - Development workflow, code standards, and quality tools
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - CI/CD setup, Docker configuration, and cloud deployment
 
 ## Contributing
 
-1. Install pre-commit hooks:
-   ```bash
-   cd backend
-   uv run pre-commit install
-   uv run pre-commit install --hook-type pre-push
-   ```
+We welcome contributions! To get started:
 
-2. Run tests before committing:
-   ```bash
-   uv run pytest
-   ```
+1. **Setup development tools:** `./setup-dev-tools.sh`
+2. **Read the [Contributing Guide](docs/CONTRIBUTING.md)** for detailed workflow and standards
+3. **Check the [Architecture Overview](docs/ARCHITECTURE.md)** to understand the codebase
+
+For quick development:
+```bash
+# Install pre-commit hooks
+pre-commit install
+
+# Run tests
+cd backend && uv run pytest
+cd frontend && npm test
+```
 
 ## License
 
