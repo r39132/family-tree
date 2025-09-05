@@ -135,7 +135,6 @@ The project includes GitHub Actions workflow for automatic deployment to Google 
 
 - **[Architecture Overview](docs/ARCHITECTURE.md)** - Technical architecture, data flow, and sequence diagrams
 - **[Screenshots](docs/SCREENSHOTS.md)** - Application screenshots and UI examples
-- **[Contributing Guide](docs/CONTRIBUTING.md)** - Development workflow, code standards, and quality tools
 - **[Deployment Guide](docs/DEPLOYMENT.md)** - CI/CD setup, Docker configuration, and cloud deployment
 
 ## Contributing
