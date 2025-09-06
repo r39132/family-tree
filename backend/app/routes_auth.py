@@ -254,7 +254,7 @@ def forgot(payload: ForgotRequest):
         return {"ok": True}
     token = create_reset_token(payload.username)
     reset_link = (
-        f"{'http://localhost:3000'}/reset?token={token}&username={payload.username}"  # frontend URL
+        f"{settings.frontend_url}/reset?token={token}&username={payload.username}"  # frontend URL
     )
     send_mail(payload.email, "Password Reset", f"Reset your password: {reset_link}")
     return {"ok": True}
