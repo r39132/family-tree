@@ -275,6 +275,16 @@ def test_email(to: str):
         raise HTTPException(status_code=500, detail=f"Email sending failed: {str(e)}")
 
 
+@router.get("/debug-frontend-url")
+def debug_frontend_url():
+    """Temporary debug endpoint to check what frontend URL is being used"""
+    return {
+        "frontend_url_from_settings": settings.frontend_url,
+        "sample_invite_link": f"{settings.frontend_url}/register?invite=test-code-123",
+        "sample_reset_link": f"{settings.frontend_url}/reset?token=test-token&username=test-user",
+    }
+
+
 @router.post("/invite")
 def create_invite(count: int = 1, current_user: str = Depends(get_current_username)):
     if not settings.require_invite:
