@@ -420,7 +420,7 @@ def update_member(
     else:
         ref.update(data)
     new = ref.get().to_dict()
-    return Member(id=member_id, **new)
+    return Member(id=member_id, **{k: v for k, v in new.items() if k != "id"})
 
 
 @router.delete("/members/{member_id}")
@@ -476,11 +476,12 @@ def set_spouse(
         ref.update({"spouse_id": None})
         return {"ok": True}
     # Link both sides for convenience
-    ref.update({"spouse_id": spouse_id})
     if spouse_id:
         sref = db.collection("members").document(spouse_id)
-        if sref.get().exists:
-            sref.update({"spouse_id": member_id})
+        if not sref.get().exists:
+            raise HTTPException(status_code=404, detail="Spouse not found")
+        sref.update({"spouse_id": member_id})
+    ref.update({"spouse_id": spouse_id})
     return {"ok": True}
 
 

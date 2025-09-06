@@ -68,19 +68,27 @@ class FakeDoc:
 
 
 class FakeQuery:
-    def __init__(self, store, col, field, value):
+    def __init__(self, store, col, field, value, limit_count=None):
         self._store = store
         self._col = col
         self._field = field
         self._value = value
+        self._limit_count = limit_count
 
     def stream(self):
+        count = 0
         for doc_id, data in list(self._store[self._col].items()):
             if data.get(self._field) == self._value:
+                if self._limit_count is not None and count >= self._limit_count:
+                    break
                 yield FakeDoc(self._store, self._col, doc_id).get()
+                count += 1
 
     def get(self):
         return [d for d in self.stream()]
+
+    def limit(self, count):
+        return FakeQuery(self._store, self._col, self._field, self._value, count)
 
 
 class FakeCollection:
@@ -100,7 +108,7 @@ class FakeCollection:
 
     def where(self, field, op, value):
         assert op == "=="
-        return FakeQuery(self._store, self._name, field, value)
+        return FakeQuery(self._store, self._name, field, value, None)
 
     def add(self, data):
         doc = self.document()
