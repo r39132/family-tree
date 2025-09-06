@@ -253,9 +253,7 @@ def forgot(payload: ForgotRequest):
     if data.get("email") != payload.email:
         return {"ok": True}
     token = create_reset_token(payload.username)
-    reset_link = (
-        f"{settings.frontend_url}/reset?token={token}&username={payload.username}"  # frontend URL
-    )
+    reset_link = f"{settings.frontend_url.rstrip('/')}/reset?token={token}&username={payload.username}"  # frontend URL
     send_mail(payload.email, "Password Reset", f"Reset your password: {reset_link}")
     return {"ok": True}
 
@@ -280,8 +278,8 @@ def debug_frontend_url():
     """Temporary debug endpoint to check what frontend URL is being used"""
     return {
         "frontend_url_from_settings": settings.frontend_url,
-        "sample_invite_link": f"{settings.frontend_url}/register?invite=test-code-123",
-        "sample_reset_link": f"{settings.frontend_url}/reset?token=test-token&username=test-user",
+        "sample_invite_link": f"{settings.frontend_url.rstrip('/')}/register?invite=test-code-123",
+        "sample_reset_link": f"{settings.frontend_url.rstrip('/')}/reset?token=test-token&username=test-user",
     }
 
 
@@ -399,7 +397,7 @@ def email_invite_link(code: str, payload: dict, current_user: str = Depends(get_
         print(f"❌ Invite {code} is not active")
         raise HTTPException(status_code=400, detail="Invite has already been redeemed")
 
-    register_link = f"{settings.frontend_url}/register?invite={code}"
+    register_link = f"{settings.frontend_url.rstrip('/')}/register?invite={code}"
     print(f"Registration link: {register_link}")
 
     body = (
@@ -495,7 +493,7 @@ def public_email_invite_link(code: str, payload: dict):
                 detail="Email was sent recently. Please wait before sending again.",
             )
 
-    register_link = f"{settings.frontend_url}/register?invite={code}"
+    register_link = f"{settings.frontend_url.rstrip('/')}/register?invite={code}"
     print(f"Registration link: {register_link}")
 
     body = (
