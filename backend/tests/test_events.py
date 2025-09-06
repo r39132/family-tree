@@ -92,7 +92,7 @@ def test_events(token):
                 "🎂 Birthday" if event["event_type"] == "birthday" else "🕊️ Death Anniversary"
             )
             print(
-                f"   {i+1}. {event['member_name']} - {event_type} on {event['event_date']} (age {event['age_on_date']})"
+                f"   {i + 1}. {event['member_name']} - {event_type} on {event['event_date']} (age {event['age_on_date']})"
             )
     else:
         print(f"❌ Events API failed: {response.status_code} - {response.text}")

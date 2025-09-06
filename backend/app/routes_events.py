@@ -145,7 +145,8 @@ def get_events(current_user: str = Depends(get_current_username)):
 
 @router.post("/notifications/settings")
 def update_notification_settings(
-    settings: EventNotificationSettings, current_user: str = Depends(get_current_username)
+    settings: EventNotificationSettings,
+    current_user: str = Depends(get_current_username),
 ):
     """Update event notification settings for the current user."""
     db = get_db()

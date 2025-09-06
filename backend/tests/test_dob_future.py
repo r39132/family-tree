@@ -24,7 +24,11 @@ class FakeDoc:
             def to_dict(self):
                 return dict(self._data) if self._data else {}
 
-        return R(self.id in self._store[self._col], self._store[self._col].get(self.id), self.id)
+        return R(
+            self.id in self._store[self._col],
+            self._store[self._col].get(self.id),
+            self.id,
+        )
 
     def set(self, data):
         self._store[self._col][self.id] = dict(data)

@@ -42,8 +42,8 @@ def make_badge(pct: float) -> str:
     <rect width=\"{total_w}\" height=\"20\" fill=\"url(#s)\"/>
   </g>
   <g fill=\"#fff\" text-anchor=\"middle\" font-family=\"DejaVu Sans,Verdana,Geneva,sans-serif\" font-size=\"11\">
-    <text x=\"{left_w/2}\" y=\"14\">{label}</text>
-    <text x=\"{left_w + right_w/2}\" y=\"14\">{pct_text}</text>
+    <text x=\"{left_w / 2}\" y=\"14\">{label}</text>
+    <text x=\"{left_w + right_w / 2}\" y=\"14\">{pct_text}</text>
   </g>
 </svg>
 """.strip()

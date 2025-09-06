@@ -19,7 +19,10 @@ def test_cors_middleware():
     # Test preflight request
     response = client.options(
         "/healthz",
-        headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "GET"},
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "GET",
+        },
     )
     # Should allow CORS or return 200
     assert response.status_code in [200, 204]

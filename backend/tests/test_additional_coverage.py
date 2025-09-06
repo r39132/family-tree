@@ -64,7 +64,8 @@ def test_member_create_no_auth():
     """Test member creation without authentication"""
     client = TestClient(app)
     r = client.post(
-        "/tree/members", json={"first_name": "Test", "last_name": "User", "dob": "01/01/2000"}
+        "/tree/members",
+        json={"first_name": "Test", "last_name": "User", "dob": "01/01/2000"},
     )
     assert r.status_code == 403
 
@@ -140,7 +141,10 @@ def test_cors_headers():
     client = TestClient(app)
     r = client.options(
         "/healthz",
-        headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "GET"},
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "GET",
+        },
     )
     # Should have CORS headers
     assert "access-control-allow-origin" in r.headers or r.status_code == 200

@@ -13,16 +13,58 @@ export default function Register(){
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error,setError]=useState<string|null>(null);
+  const [isValidatingInvite, setIsValidatingInvite] = useState(false);
   const router = useRouter();
 
-  // Prefill invite from query once ready
+  // Prefill invite from query once ready and validate it
   useEffect(()=>{
     if(!router.isReady) return;
     const q = router.query as { invite?: string };
     if (q.invite && !invite_code) {
       setInvite(String(q.invite));
+      validateInviteCode(String(q.invite));
     }
   }, [router.isReady, router.query, invite_code]);
+
+  // Validate invite code when it changes
+  useEffect(() => {
+    if (invite_code && invite_code.trim()) {
+      validateInviteCode(invite_code);
+    }
+  }, [invite_code]);
+
+  async function validateInviteCode(code: string) {
+    if (!code.trim()) return;
+
+    setIsValidatingInvite(true);
+    try {
+      const response = await api(`/auth/invites/${encodeURIComponent(code)}/validate`, {
+        method: 'GET'
+      });
+
+      if (!response.valid) {
+        // Redirect to error page with specific error details
+        const errorType = response.error === 'already_redeemed' ? 'redeemed' :
+                         response.error === 'expired' ? 'expired' : 'invalid';
+        const errorMessage = response.message ||
+                           (response.error === 'already_redeemed' ?
+                            'This invite code has already been redeemed.' :
+                            'This invite code is invalid or has expired.');
+
+        router.push(`/invite-error?type=${errorType}&message=${encodeURIComponent(errorMessage)}`);
+        return;
+      }
+
+      // Clear any previous errors if invite is valid
+      setError(null);
+    } catch (err: any) {
+      console.error('Error validating invite:', err);
+      // Don't redirect on network errors, just show error message
+      setError('Unable to validate invite code. Please check your connection and try again.');
+    } finally {
+      setIsValidatingInvite(false);
+    }
+  }
 
   function isValidEmail(v:string){
     // Simple email regex similar to MemberEditor
@@ -44,11 +86,25 @@ export default function Register(){
       setError('Passwords do not match.');
       return;
     }
+
+    // Don't allow submission while validating invite
+    if (isValidatingInvite) {
+      setError('Please wait while we validate your invite code.');
+      return;
+    }
+
     try{
       await api('/auth/register',{method:'POST', body:JSON.stringify({invite_code,username,email,password})});
       router.push('/login');
     }catch(err:any){
-      setError(err.message);
+      // Check if the error indicates a redeemed token or existing user
+      if (err.message.includes('already been redeemed') || err.message.includes('already registered')) {
+        router.push(`/invite-error?type=redeemed&message=${encodeURIComponent(err.message)}`);
+      } else if (err.message.includes('already exists') || err.message.includes('registered user')) {
+        setError('An account with this email address already exists. Please use a different email or proceed to login.');
+      } else {
+        setError(err.message);
+      }
     }
   }
 
@@ -60,7 +116,27 @@ export default function Register(){
           <h1>Register</h1>
           {error && <p style={{color:'crimson'}}>{error}</p>}
           <form onSubmit={submit}>
-          <input className="input" placeholder="Invite Code" value={invite_code} onChange={e=>setInvite(e.target.value)}/>
+          <div className="input-wrap">
+            <input
+              className="input"
+              placeholder="Invite Code"
+              value={invite_code}
+              onChange={e=>setInvite(e.target.value)}
+              disabled={isValidatingInvite}
+            />
+            {isValidatingInvite && (
+              <div style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                fontSize: '12px',
+                color: '#6b7280'
+              }}>
+                Validating...
+              </div>
+            )}
+          </div>
           <input className="input" placeholder="Username" value={username} onChange={e=>setUsername(e.target.value)}/>
           <input className="input" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)}/>
           <div className="input-wrap">

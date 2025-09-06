@@ -11,8 +11,10 @@ type InviteItem = {
   used_by?: string;
   used_email?: string;
   used_at?: any;
+  redeemed_at?: any;  // New field for redemption date
   sent_email?: string;
   sent_at?: any;
+  invited_at?: any;   // New field for invite sent date
 };
 
 export default function Invite(){
@@ -23,6 +25,7 @@ export default function Invite(){
   const [justCreated, setJustCreated] = useState<string[]>([]);
 
   // Helper function to format dates in user-friendly format
+  // Dates are stored in GMT and should be displayed in user's local timezone
   const formatDate = (dateValue: any): string => {
     if (!dateValue) return '';
 
@@ -31,7 +34,7 @@ export default function Invite(){
 
       // Handle Firestore timestamp format or ISO string
       if (typeof dateValue === 'object' && dateValue.seconds) {
-        // Firestore timestamp format
+        // Firestore timestamp format - already in UTC
         date = new Date(dateValue.seconds * 1000);
       } else if (typeof dateValue === 'string') {
         date = new Date(dateValue);
@@ -42,16 +45,17 @@ export default function Invite(){
       // Check if date is valid
       if (isNaN(date.getTime())) return String(dateValue);
 
-      // Format in user's local timezone
+      // Format in user's local timezone with explicit timezone display
       return date.toLocaleString(undefined, {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-        hour12: true
+        timeZoneName: 'short'  // Show timezone abbreviation
       });
-    } catch {
+    } catch (e) {
+      console.error('Error formatting date:', e, dateValue);
       return String(dateValue);
     }
   };
@@ -205,7 +209,8 @@ export default function Invite(){
                 <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Token</th>
                 <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Email</th>
                 <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Username</th>
-                <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Date</th>
+                <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Invited At</th>
+                <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Redeemed At</th>
                 <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Status</th>
                 <th style={{textAlign:'left', borderBottom:'1px solid #eaeaea', padding:'8px'}}>Actions</th>
               </tr>
@@ -213,12 +218,23 @@ export default function Invite(){
             <tbody>
               {filtered.map(row=>{
                 const st = getStatus(row);
-                // Show different dates based on status
-                let dateToShow = '';
-                if (st === 'redeemed' && row.used_at) {
-                  dateToShow = formatDate(row.used_at);
-                } else if (st === 'invite-sent' && row.sent_at) {
-                  dateToShow = formatDate(row.sent_at);
+
+                // Format invited date (when invite was sent)
+                let invitedDate = '';
+                if (row.invited_at) {
+                  invitedDate = formatDate(row.invited_at);
+                } else if (row.sent_at) {
+                  // Fallback to legacy sent_at field
+                  invitedDate = formatDate(row.sent_at);
+                }
+
+                // Format redeemed date (when invite was used)
+                let redeemedDate = '';
+                if (row.redeemed_at) {
+                  redeemedDate = formatDate(row.redeemed_at);
+                } else if (row.used_at) {
+                  // Fallback to legacy used_at field
+                  redeemedDate = formatDate(row.used_at);
                 }
 
                 const status = st === 'redeemed' ? 'Redeemed' : (st === 'invite-sent' ? 'Invite Sent' : 'Available');
@@ -227,7 +243,8 @@ export default function Invite(){
                     <td style={{padding:'8px'}}><code>{row.code}</code></td>
                     <td style={{padding:'8px'}}>{row.used_email || row.sent_email || ''}</td>
                     <td style={{padding:'8px'}}>{row.used_by || ''}</td>
-                    <td style={{padding:'8px'}}>{dateToShow}</td>
+                    <td style={{padding:'8px'}}>{invitedDate}</td>
+                    <td style={{padding:'8px'}}>{redeemedDate}</td>
                     <td style={{padding:'8px'}}>{status}</td>
                     <td style={{padding:'8px'}}>
                       {st === 'available' && (

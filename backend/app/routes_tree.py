@@ -270,7 +270,9 @@ def save_tree(request: Request, username: str = Depends(get_current_username)):
 
 @router.post("/recover")
 def recover_tree(
-    req: RecoverTreeRequest, request: Request, username: str = Depends(get_current_username)
+    req: RecoverTreeRequest,
+    request: Request,
+    username: str = Depends(get_current_username),
 ):
     _ensure_auth_header(request)
     db = get_db()
@@ -317,7 +319,9 @@ def backfill_versions(request: Request, username: str = Depends(get_current_user
 
 @router.post("/members", response_model=Member)
 def create_member(
-    member: CreateMember, request: Request, username: str = Depends(get_current_username)
+    member: CreateMember,
+    request: Request,
+    username: str = Depends(get_current_username),
 ):
     _ensure_auth_header(request)
     db = get_db()
@@ -328,7 +332,8 @@ def create_member(
         key_ref.create({"_": True})
     except AlreadyExists:
         raise HTTPException(
-            status_code=409, detail="Member with same first_name and last_name already exists"
+            status_code=409,
+            detail="Member with same first_name and last_name already exists",
         )
     doc_ref = db.collection("members").document()
     data = member.model_dump(exclude={"id"}) | {"name_key": key}

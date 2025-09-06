@@ -282,7 +282,12 @@ def test_delete_redeemed_invite_fails():
 
     # Create a redeemed invite
     fake_db.collection("invites").document("redeemed-code").set(
-        {"active": False, "created_by": "tester", "used_by": "someuser", "used_at": "2023-01-02"}
+        {
+            "active": False,
+            "created_by": "tester",
+            "used_by": "someuser",
+            "used_at": "2023-01-02",
+        }
     )
 
     response = client.delete("/auth/invites/redeemed-code", headers={"Authorization": "Bearer x"})

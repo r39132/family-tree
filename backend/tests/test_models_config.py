@@ -73,7 +73,11 @@ def test_token_response_model():
 def test_member_model():
     """Test Member model"""
     member = Member(
-        id="123", first_name="John", last_name="Doe", dob="01/15/1990", email="john@example.com"
+        id="123",
+        first_name="John",
+        last_name="Doe",
+        dob="01/15/1990",
+        email="john@example.com",
     )
     assert member.id == "123"
     assert member.first_name == "John"

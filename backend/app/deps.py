@@ -13,7 +13,8 @@ def get_current_username(
 ) -> str:
     if credentials is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization header"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authorization header",
         )
 
     try:
