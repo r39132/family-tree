@@ -398,7 +398,11 @@ def email_invite_link(code: str, payload: dict, current_user: str = Depends(get_
         raise HTTPException(status_code=400, detail="Invite has already been redeemed")
 
     register_link = f"{settings.frontend_url.rstrip('/')}/register?invite={code}"
-    print(f"Registration link: {register_link}")
+    print("=== DEBUG EMAIL URL GENERATION (AUTH) ===")
+    print(f"Raw settings.frontend_url: '{settings.frontend_url}'")
+    print(f"After rstrip('/'): '{settings.frontend_url.rstrip('/')}'")
+    print(f"Final registration link: '{register_link}'")
+    print("========================================")
 
     body = (
         "You're invited to join Family Tree!\n\n"
@@ -494,7 +498,11 @@ def public_email_invite_link(code: str, payload: dict):
             )
 
     register_link = f"{settings.frontend_url.rstrip('/')}/register?invite={code}"
-    print(f"Registration link: {register_link}")
+    print("=== DEBUG EMAIL URL GENERATION (PUBLIC) ===")
+    print(f"Raw settings.frontend_url: '{settings.frontend_url}'")
+    print(f"After rstrip('/'): '{settings.frontend_url.rstrip('/')}'")
+    print(f"Final registration link: '{register_link}'")
+    print("==========================================")
 
     body = (
         "You're invited to join Family Tree!\n\n"
