@@ -61,4 +61,5 @@ def get_config():
         "enable_map": settings.enable_map,
         "google_maps_api_key": settings.google_maps_api_key,
         "require_invite": settings.require_invite,
+        "frontend_url": settings.frontend_url,
     }
