@@ -283,6 +283,22 @@ def debug_frontend_url():
     }
 
 
+@router.get("/debug-email-config")
+def debug_email_config():
+    """Debug endpoint to check email configuration"""
+    can_send_real = bool(settings.use_email_in_dev and settings.smtp_host and settings.smtp_user)
+    return {
+        "use_email_in_dev": settings.use_email_in_dev,
+        "smtp_host": settings.smtp_host,
+        "smtp_user": settings.smtp_user,
+        "email_from": settings.email_from,
+        "email_from_name": settings.email_from_name,
+        "can_send_real_email": can_send_real,
+        "frontend_url": settings.frontend_url,
+        "debug_mode": settings.debug,
+    }
+
+
 @router.post("/invite")
 def create_invite(count: int = 1, current_user: str = Depends(get_current_username)):
     if not settings.require_invite:
