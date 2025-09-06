@@ -143,13 +143,38 @@ jobs:
           docker push "$IMAGE_MAIN"
 
       - name: Deploy to Cloud Run
+        shell: bash
+        env:
+          SERVICE_NAME: ${{ secrets.CLOUD_RUN_SERVICE }}
+          REGION: ${{ secrets.CLOUD_RUN_REGION }}
+          IMAGE: ${{ env.IMAGE }}
+          GOOGLE_CLOUD_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
         run: |
-          gcloud run deploy ${{ secrets.CLOUD_RUN_SERVICE }} \
-            --image "$IMAGE" \
-            --region ${{ secrets.CLOUD_RUN_REGION }} \
+          set -euo pipefail
+
+          # Write envs as YAML (bulletproof vs. --set-env-vars quoting)
+          cat > env.yaml <<'YAML'
+          GOOGLE_CLOUD_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          FIRESTORE_DATABASE: family-tree
+          ENABLE_MAP: ${{ secrets.ENABLE_MAP || 'false' }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY || '' }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL || 'http://localhost:3000' }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_FROM_NAME: ${{ secrets.EMAIL_FROM_NAME }}
+          USE_EMAIL_IN_DEV: true
+          YAML
+
+          # Deploy
+          gcloud run deploy "${SERVICE_NAME}" \
+            --image "${IMAGE}" \
+            --region "${REGION}" \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }},FIRESTORE_DATABASE=family-tree,ENABLE_MAP=${{ secrets.ENABLE_MAP || 'false' }},GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY || '' }},FRONTEND_URL=${{ secrets.FRONTEND_URL || 'http://localhost:3000' }},SMTP_HOST=${{ secrets.SMTP_HOST }},SMTP_PORT=${{ secrets.SMTP_PORT || '587' }},SMTP_USER=${{ secrets.SMTP_USER }},SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }},EMAIL_FROM=${{ secrets.EMAIL_FROM }},EMAIL_FROM_NAME=${{ secrets.EMAIL_FROM_NAME }},USE_EMAIL_IN_DEV=true"
+            --env-vars-file=env.yaml
 
       - name: Print Cloud Run URL
         run: |
