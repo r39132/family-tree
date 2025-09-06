@@ -135,12 +135,21 @@ def register(payload: RegisterRequest):
         print("✅ Invite code is valid and active")
 
     print("Creating user account...")
+    import time
+
     user_ref.set(
         {
             "email": payload.email,
             "password_hash": hash_password(payload.password),
-            "created_at": firestore.SERVER_TIMESTAMP,
+            "created_at": int(time.time()),  # Epoch seconds
             "invite_code_used": payload.invite_code,
+            # role & session fields
+            "roles": [],
+            "sessions_invalid_after": None,
+            # login stats
+            "first_login_at": None,
+            "last_login_at": None,
+            "login_count": 0,
         }
     )
     print(f"✅ User {payload.username} created successfully")
@@ -223,7 +232,30 @@ def login(payload: LoginRequest):
     data = user.to_dict()
     if not verify_password(payload.password, data.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Check if user is evicted (has sessions_invalid_after set)
+    if data.get("sessions_invalid_after"):
+        raise HTTPException(
+            status_code=403,
+            detail="Your account has been evicted. Please contact an administrator.",
+        )
+
+    # Issue token and update login stats with epoch timestamps
+    import time
+
+    now_epoch = int(time.time())
     token = create_access_token(payload.username)
+
+    update_data = {
+        "last_login_at": now_epoch,
+        "login_count": (data.get("login_count") or 0) + 1,
+    }
+
+    # Set first login if not set
+    if not data.get("first_login_at"):
+        update_data["first_login_at"] = now_epoch
+
+    db.collection("users").document(payload.username).update(update_data)
     return TokenResponse(access_token=token)
 
 
@@ -239,6 +271,7 @@ def get_current_user(current_user: str = Depends(get_current_username)):
         "username": current_user,
         "email": data.get("email"),
         "created_at": data.get("created_at"),
+        "roles": data.get("roles", []),
     }
 
 
@@ -288,6 +321,7 @@ def create_invite(count: int = 1, current_user: str = Depends(get_current_userna
     if not settings.require_invite:
         raise HTTPException(status_code=400, detail="Invites are disabled")
     db = get_db()
+    # Note: Eviction is already enforced in get_current_username dependency
     if count < 1 or count > 10:
         raise HTTPException(status_code=400, detail="count must be between 1 and 10")
     codes = []

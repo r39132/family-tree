@@ -13,6 +13,7 @@ type Props = {
 type UserInfo = {
   username: string;
   email: string;
+  roles?: string[];
 };
 
 type AppConfig = {
@@ -150,6 +151,31 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
                 >
                   {userInfo.username}
                 </div>
+                {userInfo?.roles?.includes('admin') && (
+                  <Link
+                    href="/admin"
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      padding: '10px 16px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: '#333',
+                      fontSize: '14px',
+                      textDecoration: 'none',
+                      transition: 'background-color 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f8f9fa';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                    onClick={() => setDropdownOpen(false)}
+                  >
+                    Admin
+                  </Link>
+                )}
                 {showInvite && (
                   <Link
                     href="/invite"

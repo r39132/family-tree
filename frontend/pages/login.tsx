@@ -46,10 +46,39 @@ export default function Login(){
     }
 
     try{
-      const res = await api('/auth/login',{method:'POST', body:JSON.stringify({username,password})});
+      // Use direct fetch instead of api() to handle eviction errors specifically
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8080";
+      const response = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({username, password})
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+
+        // Handle specific eviction error
+        if (response.status === 403 && errorText.includes('evicted')) {
+          setError('Your account has been evicted. Please contact an administrator.');
+          return;
+        }
+
+        // Handle other errors with user-friendly messages
+        if (response.status === 401) {
+          setError('Invalid username or password. Please check your credentials and try again.');
+          return;
+        }
+
+        // Generic error handling
+        throw new Error(`${response.status}: ${errorText}`);
+      }
+
+      const res = await response.json();
       localStorage.setItem('token', res.access_token);
       if(remember) localStorage.setItem('remember','1'); else localStorage.removeItem('remember');
-  router.push('/');
+      router.push('/');
     }catch(err:any){
       setError(getErrorMessage(err.message || 'An unexpected error occurred'));
     }
