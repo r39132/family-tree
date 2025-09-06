@@ -132,6 +132,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES=60
 ENABLE_MAP=true
 GOOGLE_MAPS_API_KEY=your-maps-api-key
 REQUIRE_INVITE=false
+FRONTEND_URL=https://your-frontend-domain.com
 
 # Email Configuration (optional)
 SMTP_HOST=smtp.gmail.com

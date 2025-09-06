@@ -389,7 +389,7 @@ def email_invite_link(code: str, payload: dict, current_user: str = Depends(get_
         print(f"❌ Invite {code} is not active")
         raise HTTPException(status_code=400, detail="Invite has already been redeemed")
 
-    register_link = f"{'http://localhost:3000'}/register?invite={code}"
+    register_link = f"{settings.frontend_url}/register?invite={code}"
     print(f"Registration link: {register_link}")
 
     body = (
@@ -485,7 +485,7 @@ def public_email_invite_link(code: str, payload: dict):
                 detail="Email was sent recently. Please wait before sending again.",
             )
 
-    register_link = f"{'http://localhost:3000'}/register?invite={code}"
+    register_link = f"{settings.frontend_url}/register?invite={code}"
     print(f"Registration link: {register_link}")
 
     body = (

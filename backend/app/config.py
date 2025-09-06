@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     require_invite: bool = Field(default=True, alias="REQUIRE_INVITE")
     enable_map: bool = Field(default=False, alias="ENABLE_MAP")
     google_maps_api_key: str = Field(default="", alias="GOOGLE_MAPS_API_KEY")
+    frontend_url: str = Field(default="http://localhost:3000", alias="FRONTEND_URL")
 
     class Config:
         env_file = ".env"
