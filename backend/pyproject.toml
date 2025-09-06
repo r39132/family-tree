@@ -49,6 +49,8 @@ omit = [
     "scripts/**/*.py",
     "backend/scripts/*",
     "backend/scripts/**/*.py",
+    "app/migrate_dates_and_cleanup.py",
+    "app/scripts_*.py",
 ]
 
 [tool.coverage.report]
@@ -57,6 +59,8 @@ omit = [
     "scripts/**/*.py",
     "backend/scripts/*",
     "backend/scripts/**/*.py",
+    "app/migrate_dates_and_cleanup.py",
+    "app/scripts_*.py",
 ]
 
 [tool.mypy]
