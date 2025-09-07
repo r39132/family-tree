@@ -16,6 +16,7 @@ from .models import (
     TreeVersionInfo,
     UpdateMember,
 )
+from .utils.time import to_iso_string, utc_now
 
 
 def _name_key(first_name: str, last_name: str) -> str:
@@ -258,7 +259,7 @@ def save_tree(request: Request, username: str = Depends(get_current_username)):
     db = get_db()
     rels = _snapshot_relations(db)
     doc = db.collection("tree_versions").document()
-    created_at = datetime.now(timezone.utc).isoformat()
+    created_at = to_iso_string(utc_now())
     version = _next_version_number(db)
     doc.set({"created_at": created_at, "relations": rels, "version": version})
 
@@ -341,7 +342,7 @@ def create_member(
     try:
         dob_dt = datetime.strptime(member.dob, "%m/%d/%Y").replace(tzinfo=timezone.utc)
         # Validate not in the future
-        if dob_dt > datetime.now(timezone.utc):
+        if dob_dt > utc_now():
             raise HTTPException(status_code=400, detail="Date of Birth cannot be in the future")
         data["dob_ts"] = dob_dt
     except HTTPException:
@@ -380,7 +381,7 @@ def update_member(
     if "dob" in data and data.get("dob"):
         try:
             dob_dt = datetime.strptime(data["dob"], "%m/%d/%Y").replace(tzinfo=timezone.utc)
-            if dob_dt > datetime.now(timezone.utc):
+            if dob_dt > utc_now():
                 raise HTTPException(status_code=400, detail="Date of Birth cannot be in the future")
             data["dob_ts"] = dob_dt
         except HTTPException:

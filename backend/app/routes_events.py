@@ -55,7 +55,8 @@ def get_all_year_events(
         year = utc_now().year
 
     events = []
-    today = utc_now()
+    # Use naive datetime for date comparisons since parsed dates are naive
+    today = utc_now().date()  # Convert to date for comparison
 
     for member in members:
         if not member.get("dob"):
@@ -109,8 +110,8 @@ def get_all_year_events(
     events.sort(key=lambda x: x.event_date)
 
     # Split into upcoming and past
-    upcoming = [e for e in events if datetime.strptime(e.event_date, "%Y-%m-%d") >= today]
-    past = [e for e in events if datetime.strptime(e.event_date, "%Y-%m-%d") < today]
+    upcoming = [e for e in events if datetime.strptime(e.event_date, "%Y-%m-%d").date() >= today]
+    past = [e for e in events if datetime.strptime(e.event_date, "%Y-%m-%d").date() < today]
 
     # Sort past events in reverse chronological order (most recent first)
     past.sort(key=lambda x: x.event_date, reverse=True)
@@ -182,14 +183,14 @@ def send_event_reminders():
 
     # Get events happening in next 2 days
     upcoming_events, _ = get_all_year_events(members)
-    today = utc_now()
+    today = utc_now().date()  # Use date for comparison
     near_future = today + timedelta(days=2)
 
     # Filter to events within 48 hours
     imminent_events = [
         event
         for event in upcoming_events
-        if today <= datetime.strptime(event.event_date, "%Y-%m-%d") <= near_future
+        if today <= datetime.strptime(event.event_date, "%Y-%m-%d").date() <= near_future
     ]
 
     sent_count = 0
