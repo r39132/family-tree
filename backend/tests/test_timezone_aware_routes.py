@@ -28,7 +28,7 @@ def test_health_endpoint_returns_timezone_aware_timestamp():
     assert parsed.tzinfo == timezone.utc
 
 
-@patch("app.firestore_client.get_db")
+@patch("app.routes_admin.get_db")
 def test_admin_log_action_uses_timezone_aware_timestamp(mock_get_db):
     """Test that admin log actions use timezone-aware timestamps."""
     from app.routes_admin import log_admin_action
@@ -62,13 +62,13 @@ def test_admin_log_action_uses_timezone_aware_timestamp(mock_get_db):
     assert abs((now - parsed).total_seconds()) < 5
 
 
-@patch("app.firestore_client.get_db")
+@patch("app.routes_admin.get_db")
 def test_user_eviction_uses_timezone_aware_timestamp(mock_get_db):
     """Test that user eviction uses timezone-aware timestamps."""
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
-    from app.routes_admin import router
+    from app.routes_admin import require_admin, router
 
     # Create test app with admin router
     app = FastAPI()
@@ -91,11 +91,11 @@ def test_user_eviction_uses_timezone_aware_timestamp(mock_get_db):
     mock_db.collection.return_value = mock_collection
     mock_get_db.return_value = mock_db
 
-    client = TestClient(app)
+    # Override the dependency
+    app.dependency_overrides[require_admin] = lambda: "admin_user"
 
-    # Mock authentication
-    with patch("app.routes_admin.require_admin", return_value="admin_user"):
-        response = client.post("/admin/users/test_user/evict")
+    client = TestClient(app)
+    response = client.post("/admin/users/test_user/evict")
 
     assert response.status_code == 200
 
@@ -119,8 +119,8 @@ def test_events_uses_timezone_aware_current_time():
     """Test that event processing uses timezone-aware current time."""
     from app.routes_events import get_all_year_events
 
-    # Mock member data
-    members = [{"dob": "1990-01-15", "name": "Test Person"}]
+    # Mock member data with required fields
+    members = [{"id": "test_id", "dob": "1990-01-15", "first_name": "Test", "last_name": "Person"}]
 
     # Call function - should not raise any timezone-related errors
     upcoming, past = get_all_year_events(members, year=2025)
@@ -140,7 +140,12 @@ def test_events_notification_uses_utc_now(mock_utc_now):
     mock_utc_now.return_value = mock_time
 
     members = [
-        {"dob": "1990-06-16", "name": "Test Person"}  # Birthday tomorrow
+        {
+            "id": "test_id",
+            "dob": "1990-06-16",
+            "first_name": "Test",
+            "last_name": "Person",
+        }  # Birthday tomorrow
     ]
 
     upcoming, past = get_all_year_events(members, year=2025)
@@ -187,13 +192,11 @@ def test_no_naive_datetime_usage_in_auth_utils():
 @patch("app.routes_auth.utc_now")
 def test_routes_auth_uses_utc_now_for_time_diff(mock_utc_now):
     """Test that routes_auth uses utc_now for time difference calculations."""
-    # This would require more complex mocking of the entire auth flow
-    # For now, we'll verify that utc_now is imported and available
     from app import routes_auth
 
     # Check that the module has access to timezone-aware utilities
-    # This is a smoke test to ensure imports are working
-    assert hasattr(routes_auth, "timezone")  # Should have timezone import
+    # Verify that utc_now is imported and available in the module
+    assert hasattr(routes_auth, "utc_now")  # Should have utc_now import
 
     # The actual time difference calculation happens in a complex auth flow
     # that would require extensive mocking to test properly
