@@ -473,31 +473,56 @@ def email_invite_link(code: str, payload: dict, current_user: str = Depends(get_
 
     db = get_db()
 
-    # Check if email already belongs to a registered user
-    print("Checking if email already belongs to a registered user...")
-    users_query = db.collection("users").where("email", "==", to_email).limit(1)
-    existing_users = list(users_query.stream())
-    if existing_users:
-        username = existing_users[0].id
-        print(f"❌ Email {to_email} already belongs to user: {username}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Email address {to_email} is already registered to an existing user. Please use a different email address.",
-        )
-    print("✅ Email is not registered to any existing user")
-
+    # Get invite details first to check the space
     ref = db.collection("invites").document(code)
     doc = ref.get()
     if not doc.exists:
         print(f"❌ Invite {code} not found")
         raise HTTPException(status_code=404, detail="Invite not found")
 
-    data = doc.to_dict() or {}
-    print(f"Invite data: {data}")
+    invite_data = doc.to_dict() or {}
+    print(f"Invite data: {invite_data}")
 
-    if not data.get("active", False):
+    invite_space_id = invite_data.get("space_id", "demo")
+    print(f"Invite is for space: {invite_space_id}")
+
+    if not invite_data.get("active", False):
         print(f"❌ Invite {code} is not active")
         raise HTTPException(status_code=400, detail="Invite has already been redeemed")
+
+    # Check if email already belongs to a registered user
+    print("Checking if email already belongs to a registered user...")
+    users_query = db.collection("users").where("email", "==", to_email).limit(1)
+    existing_users = list(users_query.stream())
+    if existing_users:
+        username = existing_users[0].id
+        user_data = existing_users[0].to_dict() or {}
+        current_user_space = user_data.get("current_space", "demo")
+        print(f"✓ Email {to_email} belongs to existing user: {username}")
+        print(f"User's current space: {current_user_space}")
+
+        # Check if user already has access to the invite's target space
+        # We'll check if they have any members in the target space
+        members_query = (
+            db.collection("members")
+            .where("created_by", "==", username)
+            .where("space_id", "==", invite_space_id)
+            .limit(1)
+        )
+        existing_members = list(members_query.stream())
+
+        if existing_members or current_user_space == invite_space_id:
+            print(f"❌ User {username} already has access to space {invite_space_id}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"User {username} already has access to the {invite_space_id} family space.",
+            )
+        else:
+            print(
+                f"✓ User {username} doesn't have access to space {invite_space_id}, invite is valid"
+            )
+    else:
+        print("✓ Email is not registered to any existing user")
 
     register_link = f"{settings.frontend_url.rstrip('/')}/register?invite={code}"
     print("=== DEBUG EMAIL URL GENERATION (AUTH) ===")
@@ -550,34 +575,59 @@ def public_email_invite_link(code: str, payload: dict):
 
     db = get_db()
 
-    # Check if email already belongs to a registered user
-    print("Checking if email already belongs to a registered user...")
-    users_query = db.collection("users").where("email", "==", to_email).limit(1)
-    existing_users = list(users_query.stream())
-    if existing_users:
-        username = existing_users[0].id
-        print(f"❌ Email {to_email} already belongs to user: {username}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Email address {to_email} is already registered to an existing user. Please use a different email address.",
-        )
-    print("✅ Email is not registered to any existing user")
-
+    # Get invite details first to check the space
     ref = db.collection("invites").document(code)
     doc = ref.get()
     if not doc.exists:
         print(f"❌ Public invite {code} not found")
         raise HTTPException(status_code=404, detail="Invite not found")
 
-    data = doc.to_dict() or {}
-    print(f"Invite data: {data}")
+    invite_data = doc.to_dict() or {}
+    print(f"Invite data: {invite_data}")
 
-    if not data.get("active", False):
+    invite_space_id = invite_data.get("space_id", "demo")
+    print(f"Public invite is for space: {invite_space_id}")
+
+    if not invite_data.get("active", False):
         print(f"❌ Public invite {code} is not active")
         raise HTTPException(status_code=400, detail="Invite has already been redeemed")
 
+    # Check if email already belongs to a registered user
+    print("Checking if email already belongs to a registered user...")
+    users_query = db.collection("users").where("email", "==", to_email).limit(1)
+    existing_users = list(users_query.stream())
+    if existing_users:
+        username = existing_users[0].id
+        user_data = existing_users[0].to_dict() or {}
+        current_user_space = user_data.get("current_space", "demo")
+        print(f"✓ Email {to_email} belongs to existing user: {username}")
+        print(f"User's current space: {current_user_space}")
+
+        # Check if user already has access to the invite's target space
+        # We'll check if they have any members in the target space
+        members_query = (
+            db.collection("members")
+            .where("created_by", "==", username)
+            .where("space_id", "==", invite_space_id)
+            .limit(1)
+        )
+        existing_members = list(members_query.stream())
+
+        if existing_members or current_user_space == invite_space_id:
+            print(f"❌ User {username} already has access to space {invite_space_id}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"User {username} already has access to the {invite_space_id} family space.",
+            )
+        else:
+            print(
+                f"✓ User {username} doesn't have access to space {invite_space_id}, invite is valid"
+            )
+    else:
+        print("✓ Email is not registered to any existing user")
+
     # Basic rate limiting: check if email was sent recently (within last hour)
-    sent_at = data.get("sent_at")
+    sent_at = invite_data.get("sent_at")
     if sent_at:
         print(f"Checking rate limiting - last sent at: {sent_at}")
 
