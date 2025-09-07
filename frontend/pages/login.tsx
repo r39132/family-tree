@@ -1,19 +1,52 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '../lib/api';
 import { useRouter } from 'next/router';
 import SimpleTopNav from '../components/SimpleTopNav';
 
+interface FamilySpace {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 export default function Login(){
   const [username,setUsername]=useState('');
   const [password,setPassword]=useState('');
+  const [selectedSpace,setSelectedSpace]=useState('demo');
+  const [availableSpaces,setAvailableSpaces]=useState<FamilySpace[]>([]);
   const [showPass,setShowPass]=useState(false);
   const [remember,setRemember]=useState(true);
   const [error,setError]=useState<string|null>(null);
+  const [loading,setLoading]=useState(false);
   const router = useRouter();
 
+  // Fetch available family spaces on component mount
+  useEffect(() => {
+    async function fetchSpaces() {
+      try {
+        const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8080";
+        const response = await fetch(`${API_BASE}/spaces`);
+        if (response.ok) {
+          const spaces = await response.json();
+          setAvailableSpaces(spaces);
+        }
+      } catch (err) {
+        console.error('Failed to fetch family spaces:', err);
+        // Set default spaces if fetch fails
+        setAvailableSpaces([
+          { id: 'demo', name: 'Demo' },
+          { id: 'karunakaran', name: 'Karunakaran' },
+          { id: 'anand', name: 'Anand' },
+          { id: 'kullatira', name: 'Kullatira' }
+        ]);
+      }
+    }
+    fetchSpaces();
+  }, []);
+
   // Check if form is valid (all required fields filled)
-  const isFormValid = username.trim() !== '' && password.trim() !== '';
+  const isFormValid = username.trim() !== '' && password.trim() !== '' && selectedSpace.trim() !== '';
 
   function getErrorMessage(errorText: string): string {
     // Convert generic error messages to user-friendly ones
@@ -38,10 +71,12 @@ export default function Login(){
 
     // Clear any previous errors
     setError(null);
+    setLoading(true);
 
     // Validate form before submission
     if (!isFormValid) {
-      setError('Please fill in both username and password.');
+      setError('Please fill in all required fields.');
+      setLoading(false);
       return;
     }
 
@@ -53,7 +88,11 @@ export default function Login(){
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({username, password})
+        body: JSON.stringify({
+          username,
+          password,
+          space_id: selectedSpace
+        })
       });
 
       if (!response.ok) {
@@ -62,12 +101,21 @@ export default function Login(){
         // Handle specific eviction error
         if (response.status === 403 && errorText.includes('evicted')) {
           setError('Your account has been evicted. Please contact an administrator.');
+          setLoading(false);
           return;
         }
 
         // Handle other errors with user-friendly messages
         if (response.status === 401) {
           setError('Invalid username or password. Please check your credentials and try again.');
+          setLoading(false);
+          return;
+        }
+
+        // Handle space-related errors
+        if (response.status === 400 && errorText.includes('space')) {
+          setError('Selected family space is not available. Please choose another space.');
+          setLoading(false);
           return;
         }
 
@@ -81,6 +129,7 @@ export default function Login(){
       router.push('/');
     }catch(err:any){
       setError(getErrorMessage(err.message || 'An unexpected error occurred'));
+      setLoading(false);
     }
   }
 
@@ -129,6 +178,21 @@ export default function Login(){
                 )}
               </button>
             </div>
+            <label htmlFor="familySpace">Family Space</label>
+            <select
+              id="familySpace"
+              className="input"
+              value={selectedSpace}
+              onChange={e=>setSelectedSpace(e.target.value)}
+              title="Select your family space"
+            >
+              {availableSpaces.map(space => (
+                <option key={space.id} value={space.id}>
+                  {space.name}
+                  {space.description && ` - ${space.description}`}
+                </option>
+              ))}
+            </select>
           <label><input type="checkbox" className="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)}/>Remember me</label>
           <div className="bottombar">
             <div className="bottombar-left">
@@ -137,12 +201,12 @@ export default function Login(){
             </div>
             <div className="bottombar-right">
               <button
-                className={`btn ${!isFormValid ? 'disabled' : ''}`}
+                className={`btn ${!isFormValid || loading ? 'disabled' : ''}`}
                 type="submit"
-                disabled={!isFormValid}
-                title={!isFormValid ? 'Please fill in all fields' : 'Login to your account'}
+                disabled={!isFormValid || loading}
+                title={!isFormValid ? 'Please fill in all fields' : loading ? 'Logging in...' : 'Login to your account'}
               >
-                Login
+                {loading ? 'Logging in...' : 'Login'}
               </button>
             </div>
           </div>

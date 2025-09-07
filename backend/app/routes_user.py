@@ -17,6 +17,7 @@ class ProfileResponse(BaseModel):
     last_name: Optional[str] = None
     profile_photo_data_url: Optional[str] = None
     roles: Optional[list[str]] = None
+    current_space: Optional[str] = None
 
 
 class ProfileUpdate(BaseModel):
@@ -78,6 +79,7 @@ def get_profile(current_user: str = Depends(get_current_username)):
         last_name=data.get("last_name"),
         profile_photo_data_url=data.get("profile_photo_data_url"),
         roles=data.get("roles", []),
+        current_space=data.get("current_space", "demo"),
     )
 
 
@@ -107,6 +109,7 @@ def update_profile(update: ProfileUpdate, current_user: str = Depends(get_curren
         last_name=new_doc.get("last_name"),
         profile_photo_data_url=new_doc.get("profile_photo_data_url"),
         roles=new_doc.get("roles", []),
+        current_space=new_doc.get("current_space", "demo"),
     )
 
 
@@ -129,4 +132,5 @@ def upload_profile_photo(update: PhotoUpdate, current_user: str = Depends(get_cu
         last_name=new_doc.get("last_name"),
         profile_photo_data_url=new_doc.get("profile_photo_data_url"),
         roles=new_doc.get("roles", []),
+        current_space=new_doc.get("current_space", "demo"),
     )

@@ -13,6 +13,19 @@ from .utils.time import utc_now
 router = APIRouter(prefix="/events", tags=["events"])
 
 
+def _get_user_space(username: str) -> str:
+    """Get the current space for a user. Returns 'demo' as fallback."""
+    db = get_db()
+    user_ref = db.collection("users").document(username)
+    user_doc = user_ref.get()
+
+    if not user_doc.exists:
+        return "demo"  # Default fallback
+
+    data = user_doc.to_dict()
+    return data.get("current_space", "demo")
+
+
 def calculate_age(birth_date: str, current_date: datetime) -> int:
     """Calculate age on a given date."""
     try:
@@ -123,16 +136,20 @@ def get_all_year_events(
 def get_events(current_user: str = Depends(get_current_username)):
     """Get all family events for this year and notification settings."""
     db = get_db()
+    space_id = _get_user_space(current_user)
 
-    # Get all members from the tree
+    # Get all members from the current space
     members_ref = db.collection("members")
-    members = [doc.to_dict() | {"id": doc.id} for doc in members_ref.stream()]
+    members = [
+        doc.to_dict() | {"id": doc.id}
+        for doc in members_ref.where("space_id", "==", space_id).stream()
+    ]
 
     # Get all events for this year
     upcoming_events, past_events = get_all_year_events(members)
 
-    # Get notification settings for current user
-    settings_ref = db.collection("event_notifications").document(current_user)
+    # Get notification settings for current user in current space
+    settings_ref = db.collection("event_notifications").document(f"{current_user}_{space_id}")
     settings_doc = settings_ref.get()
     notification_enabled = (
         settings_doc.to_dict().get("enabled", False) if settings_doc.exists else False
@@ -152,12 +169,14 @@ def update_notification_settings(
 ):
     """Update event notification settings for the current user."""
     db = get_db()
+    space_id = _get_user_space(current_user)
 
-    settings_ref = db.collection("event_notifications").document(current_user)
+    settings_ref = db.collection("event_notifications").document(f"{current_user}_{space_id}")
     settings_ref.set(
         {
             "enabled": settings.enabled,
             "user_id": current_user,
+            "space_id": space_id,
             "updated_at": firestore.SERVER_TIMESTAMP,
         }
     )
@@ -170,68 +189,84 @@ def send_event_reminders():
     """Send email reminders for events happening within 48 hours (typically called by a cron job)."""
     db = get_db()
 
-    # Get all users with notifications enabled
+    # Get all users with notifications enabled (grouped by space)
     notifications_ref = db.collection("event_notifications").where("enabled", "==", True)
     enabled_users = {doc.id: doc.to_dict() for doc in notifications_ref.stream()}
 
     if not enabled_users:
         return {"ok": True, "sent": 0, "message": "No users have notifications enabled"}
 
-    # Get all members
-    members_ref = db.collection("members")
-    members = [doc.to_dict() | {"id": doc.id} for doc in members_ref.stream()]
-
-    # Get events happening in next 2 days
-    upcoming_events, _ = get_all_year_events(members)
-    today = utc_now().date()  # Use date for comparison
-    near_future = today + timedelta(days=2)
-
-    # Filter to events within 48 hours
-    imminent_events = [
-        event
-        for event in upcoming_events
-        if today <= datetime.strptime(event.event_date, "%Y-%m-%d").date() <= near_future
-    ]
-
     sent_count = 0
 
-    for user_id in enabled_users:
-        # Get user email
-        user_ref = db.collection("users").document(user_id)
-        user_doc = user_ref.get()
-        if not user_doc.exists:
-            continue
+    # Group users by space for efficient processing
+    users_by_space = {}
+    for notification_id, notification_data in enabled_users.items():
+        user_id = notification_data.get("user_id")
+        space_id = notification_data.get("space_id", "demo")
 
-        user_data = user_doc.to_dict()
-        user_email = user_data.get("email")
-        if not user_email:
-            continue
+        if space_id not in users_by_space:
+            users_by_space[space_id] = []
+        users_by_space[space_id].append((user_id, notification_id))
 
-        if imminent_events:
-            # Compose email
-            subject = f"Family Events Reminder - {len(imminent_events)} upcoming"
+    # Process each space separately
+    for space_id, users_in_space in users_by_space.items():
+        # Get all members in this space
+        members_ref = db.collection("members")
+        members = [
+            doc.to_dict() | {"id": doc.id}
+            for doc in members_ref.where("space_id", "==", space_id).stream()
+        ]
 
-            body_lines = ["Hello! Here are the upcoming family events:\n"]
-            for event in imminent_events:
-                event_date = datetime.strptime(event.event_date, "%Y-%m-%d")
-                formatted_date = event_date.strftime("%B %d, %Y")
+        # Get events happening in next 2 days for this space
+        upcoming_events, _ = get_all_year_events(members)
+        today = utc_now().date()  # Use date for comparison
+        near_future = today + timedelta(days=2)
 
-                if event.event_type == "birthday":
-                    body_lines.append(
-                        f"🎂 {event.member_name}'s birthday - {formatted_date} (turning {event.age_on_date})"
-                    )
-                else:
-                    body_lines.append(
-                        f"🕊️ {event.member_name}'s remembrance - {formatted_date} ({event.age_on_date} years)"
-                    )
+        # Filter to events within 48 hours
+        imminent_events = [
+            event
+            for event in upcoming_events
+            if today <= datetime.strptime(event.event_date, "%Y-%m-%d").date() <= near_future
+        ]
 
-            body_lines.append("\nBest regards,\nFamily Tree")
-            body = "\n".join(body_lines)
+        # Send notifications to users in this space
+        for user_id, notification_id in users_in_space:
+            # Get user email
+            user_ref = db.collection("users").document(user_id)
+            user_doc = user_ref.get()
+            if not user_doc.exists:
+                continue
 
-            try:
-                send_mail(user_email, subject, body)
-                sent_count += 1
-            except Exception as e:
-                print(f"Failed to send email to {user_email}: {e}")
+            user_data = user_doc.to_dict()
+            user_email = user_data.get("email")
+            if not user_email:
+                continue
+
+            if imminent_events:
+                # Compose email
+                subject = f"Family Events Reminder - {len(imminent_events)} upcoming"
+
+                body_lines = ["Hello! Here are the upcoming family events:\n"]
+                for event in imminent_events:
+                    event_date = datetime.strptime(event.event_date, "%Y-%m-%d")
+                    formatted_date = event_date.strftime("%B %d, %Y")
+
+                    if event.event_type == "birthday":
+                        body_lines.append(
+                            f"🎂 {event.member_name}'s birthday - {formatted_date} (turning {event.age_on_date})"
+                        )
+                    else:
+                        body_lines.append(
+                            f"🕊️ {event.member_name}'s remembrance - {formatted_date} ({event.age_on_date} years)"
+                        )
+
+                body_lines.append("\nBest regards,\nFamily Tree")
+                body = "\n".join(body_lines)
+
+                try:
+                    send_mail(user_email, subject, body)
+                    sent_count += 1
+                except Exception as e:
+                    print(f"Failed to send email to {user_email}: {e}")
 
     return {"ok": True, "sent": sent_count, "events": len(imminent_events)}

@@ -3,7 +3,6 @@ from typing import Any, Dict, List, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from google.api_core.exceptions import AlreadyExists
-from google.cloud.firestore_v1 import FieldFilter
 
 from .deps import get_current_username
 from .firestore_client import get_db
@@ -23,6 +22,19 @@ def _name_key(first_name: str, last_name: str) -> str:
     return f"{(first_name or '').strip().lower()}|{(last_name or '').strip().lower()}"
 
 
+def _get_user_space(username: str) -> str:
+    """Get the current space for a user. Returns 'demo' as fallback."""
+    db = get_db()
+    user_ref = db.collection("users").document(username)
+    user_doc = user_ref.get()
+
+    if not user_doc.exists:
+        return "demo"  # Default fallback
+
+    data = user_doc.to_dict()
+    return data.get("current_space", "demo")
+
+
 router = APIRouter(prefix="/tree", tags=["tree"])
 
 
@@ -36,9 +48,17 @@ def _ensure_auth_header(request: Request):
 def get_tree(request: Request, username: str = Depends(get_current_username)):
     _ensure_auth_header(request)
     db = get_db()
-    # Load global tree data (not user-specific)
-    members = {doc.id: doc.to_dict() | {"id": doc.id} for doc in db.collection("members").stream()}
-    relations = [(d.id, d.to_dict()) for d in db.collection("relations").stream()]
+
+    # Get user's current space
+    space_id = _get_user_space(username)
+
+    # Load space-specific tree data
+    members_query = db.collection("members").where("space_id", "==", space_id)
+    members = {doc.id: doc.to_dict() | {"id": doc.id} for doc in members_query.stream()}
+
+    relations_query = db.collection("relations").where("space_id", "==", space_id)
+    relations = [(d.id, d.to_dict()) for d in relations_query.stream()]
+
     children: Dict[Optional[str], List[str]] = {}
     for rid, rel in relations:
         parent = rel.get("parent_id")
@@ -326,18 +346,27 @@ def create_member(
 ):
     _ensure_auth_header(request)
     db = get_db()
+
+    # Get user's current space
+    space_id = _get_user_space(username)
+
+    # Check uniqueness within the space
     key = _name_key(member.first_name, member.last_name)
-    key_ref = db.collection("member_keys").document(key)
+    space_key = f"{space_id}:{key}"  # Space-scoped key
+    key_ref = db.collection("member_keys").document(space_key)
     try:
         # Ensure uniqueness by creating a guard doc; fails if exists
-        key_ref.create({"_": True})
+        key_ref.create({"space_id": space_id, "name_key": key})
     except AlreadyExists:
         raise HTTPException(
             status_code=409,
-            detail="Member with same first_name and last_name already exists",
+            detail="Member with same first_name and last_name already exists in this family space",
         )
     doc_ref = db.collection("members").document()
-    data = member.model_dump(exclude={"id"}) | {"name_key": key}
+    data = member.model_dump(exclude={"id"}) | {
+        "name_key": key,
+        "space_id": space_id,  # Associate member with space
+    }
     # derive timestamp field from MM/DD/YYYY and disallow future dates
     try:
         dob_dt = datetime.strptime(member.dob, "%m/%d/%Y").replace(tzinfo=timezone.utc)
@@ -352,7 +381,7 @@ def create_member(
         pass
     try:
         doc_ref.set(data)
-        key_ref.set({"member_id": doc_ref.id})
+        key_ref.set({"member_id": doc_ref.id, "space_id": space_id})
     except Exception:
         # rollback key if member write fails
         try:
@@ -372,10 +401,21 @@ def update_member(
 ):
     _ensure_auth_header(request)
     db = get_db()
+
+    # Get user's current space
+    space_id = _get_user_space(username)
+
     ref = db.collection("members").document(member_id)
-    if not ref.get().exists:
+    member_doc = ref.get()
+    if not member_doc.exists:
         raise HTTPException(status_code=404, detail="Member not found")
-    current = ref.get().to_dict() or {}
+
+    current = member_doc.to_dict() or {}
+
+    # Ensure member belongs to user's current space
+    if current.get("space_id") != space_id:
+        raise HTTPException(status_code=403, detail="Member not found in current family space")
+
     data = member.model_dump(exclude_unset=True)
     # If dob is present, recompute dob_ts
     if "dob" in data and data.get("dob"):
@@ -396,18 +436,21 @@ def update_member(
         current.get("first_name", ""), current.get("last_name", "")
     )
     new_key = _name_key(new_first, new_last)
+    old_space_key = f"{space_id}:{old_key}"
+    new_space_key = f"{space_id}:{new_key}"
+
     if new_key != old_key:
-        key_ref = db.collection("member_keys").document(new_key)
+        key_ref = db.collection("member_keys").document(new_space_key)
         # Attempt to reserve new key
         try:
-            key_ref.create({"member_id": member_id})
+            key_ref.create({"member_id": member_id, "space_id": space_id})
         except AlreadyExists:
             # If it belongs to this member, allow; else conflict
             doc = key_ref.get()
             if doc.exists and (doc.to_dict() or {}).get("member_id") != member_id:
                 raise HTTPException(
                     status_code=409,
-                    detail="Member with same first_name and last_name already exists",
+                    detail="Member with same first_name and last_name already exists in this family space",
                 )
         # Update member and swap keys
         data["name_key"] = new_key
@@ -415,7 +458,7 @@ def update_member(
         # Remove old key if different
         if old_key:
             try:
-                db.collection("member_keys").document(old_key).delete()
+                db.collection("member_keys").document(old_space_key).delete()
             except Exception:
                 pass
     else:
@@ -428,27 +471,49 @@ def update_member(
 def delete_member(member_id: str, request: Request, username: str = Depends(get_current_username)):
     _ensure_auth_header(request)
     db = get_db()
-    # Ensure member has no children
+
+    # Get user's current space
+    space_id = _get_user_space(username)
+
+    # Check that member exists and belongs to current space
+    member_ref = db.collection("members").document(member_id)
+    member_doc = member_ref.get()
+    if not member_doc.exists:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    member_data = member_doc.to_dict() or {}
+    if member_data.get("space_id") != space_id:
+        raise HTTPException(status_code=403, detail="Member not found in current family space")
+
+    # Ensure member has no children (space-scoped check)
     children = list(
-        db.collection("relations").where(filter=FieldFilter("parent_id", "==", member_id)).stream()
+        db.collection("relations")
+        .where("parent_id", "==", member_id)
+        .where("space_id", "==", space_id)
+        .stream()
     )
     if children:
         raise HTTPException(status_code=400, detail="Cannot delete: member has children")
-    db.collection("relations").where(filter=FieldFilter("child_id", "==", member_id)).get()
-    # Remove relation pointing to this as child
+
+    # Remove relation pointing to this as child (space-scoped)
     for rel in (
-        db.collection("relations").where(filter=FieldFilter("child_id", "==", member_id)).stream()
+        db.collection("relations")
+        .where("child_id", "==", member_id)
+        .where("space_id", "==", space_id)
+        .stream()
     ):
         db.collection("relations").document(rel.id).delete()
-    # delete unique key doc
-    mdoc = db.collection("members").document(member_id).get()
-    if mdoc.exists:
-        mk = (mdoc.to_dict() or {}).get("name_key")
-        if mk:
-            try:
-                db.collection("member_keys").document(mk).delete()
-            except Exception:
-                pass
+
+    # Delete unique key doc (space-scoped)
+    mk = member_data.get("name_key")
+    if mk:
+        space_key = f"{space_id}:{mk}"
+        try:
+            db.collection("member_keys").document(space_key).delete()
+        except Exception:
+            pass
+
+    # Delete the member
     db.collection("members").document(member_id).delete()
     return {"ok": True}
 
@@ -462,26 +527,47 @@ def set_spouse(
 ):
     _ensure_auth_header(request)
     db = get_db()
+
+    # Get user's current space
+    space_id = _get_user_space(username)
+
     ref = db.collection("members").document(member_id)
     mdoc = ref.get()
     if not mdoc.exists:
         raise HTTPException(status_code=404, detail="Member not found")
+
+    member_data = mdoc.to_dict() or {}
+    if member_data.get("space_id") != space_id:
+        raise HTTPException(status_code=403, detail="Member not found in current family space")
+
     # Unlink existing spouse if any
-    curr = mdoc.to_dict() or {}
-    current_spouse = curr.get("spouse_id")
+    current_spouse = member_data.get("spouse_id")
     spouse_id = req.spouse_id
+
     if spouse_id is None and current_spouse:
+        # Check that current spouse is in same space
         sref = db.collection("members").document(current_spouse)
-        if sref.get().exists:
-            sref.update({"spouse_id": None})
+        spouse_doc = sref.get()
+        if spouse_doc.exists:
+            spouse_data = spouse_doc.to_dict() or {}
+            if spouse_data.get("space_id") == space_id:
+                sref.update({"spouse_id": None})
         ref.update({"spouse_id": None})
         return {"ok": True}
+
     # Link both sides for convenience
     if spouse_id:
         sref = db.collection("members").document(spouse_id)
-        if not sref.get().exists:
+        spouse_doc = sref.get()
+        if not spouse_doc.exists:
             raise HTTPException(status_code=404, detail="Spouse not found")
+
+        spouse_data = spouse_doc.to_dict() or {}
+        if spouse_data.get("space_id") != space_id:
+            raise HTTPException(status_code=403, detail="Spouse not found in current family space")
+
         sref.update({"spouse_id": member_id})
+
     ref.update({"spouse_id": spouse_id})
     return {"ok": True}
 
@@ -490,18 +576,46 @@ def set_spouse(
 def move(req: MoveRequest, request: Request, username: str = Depends(get_current_username)):
     _ensure_auth_header(request)
     db = get_db()
+
+    # Get user's current space
+    space_id = _get_user_space(username)
+
+    # Validate that child exists and belongs to current space
+    child_doc = db.collection("members").document(req.child_id).get()
+    if not child_doc.exists:
+        raise HTTPException(status_code=404, detail="Child member not found")
+
+    child_data = child_doc.to_dict() or {}
+    if child_data.get("space_id") != space_id:
+        raise HTTPException(
+            status_code=403, detail="Child member not found in current family space"
+        )
+
+    # Validate new parent if specified
+    if req.new_parent_id is not None:
+        parent_doc = db.collection("members").document(req.new_parent_id).get()
+        if not parent_doc.exists:
+            raise HTTPException(status_code=404, detail="Parent member not found")
+
+        parent_data = parent_doc.to_dict() or {}
+        if parent_data.get("space_id") != space_id:
+            raise HTTPException(
+                status_code=403, detail="Parent member not found in current family space"
+            )
+
     # Prevent cycles: new_parent_id cannot be the child itself or any of its descendants
     if req.new_parent_id == req.child_id:
         raise HTTPException(status_code=400, detail="Cannot set a member as their own parent")
+
     # Prevent setting spouse as parent (nonsensical and creates duplication)
     if req.new_parent_id is not None:
-        child_doc = db.collection("members").document(req.child_id).get()
-        if child_doc.exists:
-            child_spouse = (child_doc.to_dict() or {}).get("spouse_id")
-            if child_spouse and child_spouse == req.new_parent_id:
-                raise HTTPException(status_code=400, detail="Cannot set spouse as parent")
-    # Build descendants map once to validate the move
-    rels = list(db.collection("relations").stream())
+        child_spouse = child_data.get("spouse_id")
+        if child_spouse and child_spouse == req.new_parent_id:
+            raise HTTPException(status_code=400, detail="Cannot set spouse as parent")
+
+    # Build descendants map for space-scoped relations only
+    rels_query = db.collection("relations").where("space_id", "==", space_id)
+    rels = list(rels_query.stream())
     by_parent: Dict[Optional[str], List[str]] = {}
     for r in rels:
         data = r.to_dict() or {}
@@ -525,13 +639,18 @@ def move(req: MoveRequest, request: Request, username: str = Depends(get_current
     if req.new_parent_id is not None and req.child_id is not None:
         if req.new_parent_id in descendants(req.child_id):
             raise HTTPException(status_code=400, detail="Move would create a cycle")
-    # Remove any existing parent relation for child
+
+    # Remove any existing parent relation for child (space-scoped)
     for rel in (
         db.collection("relations")
-        .where(filter=FieldFilter("child_id", "==", req.child_id))
+        .where("child_id", "==", req.child_id)
+        .where("space_id", "==", space_id)
         .stream()
     ):
         db.collection("relations").document(rel.id).delete()
-    # Set new parent (None -> root)
-    db.collection("relations").add({"child_id": req.child_id, "parent_id": req.new_parent_id})
+
+    # Set new parent (None -> root) with space_id
+    db.collection("relations").add(
+        {"child_id": req.child_id, "parent_id": req.new_parent_id, "space_id": space_id}
+    )
     return {"ok": True}

@@ -5,6 +5,8 @@ from .config import settings
 from .routes_admin import router as admin_router
 from .routes_auth import router as auth_router
 from .routes_events import router as events_router
+from .routes_spaces import ensure_default_spaces
+from .routes_spaces import router as spaces_router
 from .routes_tree import router as tree_router
 from .routes_user import router as user_router
 from .utils.time import to_iso_string, utc_now
@@ -44,6 +46,10 @@ app.include_router(tree_router)
 app.include_router(events_router)
 app.include_router(admin_router)
 app.include_router(user_router)
+app.include_router(spaces_router)
+
+# Initialize default family spaces on startup
+ensure_default_spaces()
 
 
 @app.get("/healthz")

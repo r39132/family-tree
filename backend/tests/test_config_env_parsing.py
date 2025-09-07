@@ -59,7 +59,7 @@ def test_settings_defaults_when_missing_env(monkeypatch: pytest.MonkeyPatch):
 
     # Defaults from config.py
     assert s.google_cloud_project == "local-dev"
-    assert s.firestore_database == "(default)"
+    assert s.firestore_database == "family-tree"
     assert s.enable_map is False
     assert s.use_email_in_dev is True
     assert s.smtp_port == 587

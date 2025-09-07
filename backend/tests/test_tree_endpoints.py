@@ -160,7 +160,7 @@ def setup_function(function):
             "relations": {},
             "member_keys": {},
             "invites": {},
-            "users": {},
+            "users": {"tester": {"current_space": "demo"}},
         }
     )
 
@@ -222,7 +222,9 @@ def test_spouse_linking_and_tree_roots_and_children_merge():
         headers={"Authorization": "Bearer x"},
     ).json()
     # set relation under dad
-    fake_db.collection("relations").add({"child_id": kid["id"], "parent_id": dad["id"]})
+    fake_db.collection("relations").add(
+        {"child_id": kid["id"], "parent_id": dad["id"], "space_id": "demo"}
+    )
     # tree should show couple and one child
     tree = client.get("/tree", headers={"Authorization": "Bearer x"}).json()
     assert len(tree["roots"]) >= 1

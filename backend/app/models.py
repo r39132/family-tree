@@ -9,11 +9,13 @@ class RegisterRequest(BaseModel):
     username: str
     email: EmailStr
     password: str
+    space_id: Optional[str] = None  # Selected family space
 
 
 class LoginRequest(BaseModel):
     username: str
     password: str
+    space_id: Optional[str] = None  # Selected family space
 
 
 class ForgotRequest(BaseModel):
@@ -201,3 +203,52 @@ class EventsResponse(BaseModel):
     upcoming_events: List[FamilyEvent]
     past_events: List[FamilyEvent]
     notification_enabled: bool
+
+
+class FamilySpace(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    created_at: Optional[str] = None
+    created_by: Optional[str] = None
+
+
+class FamilySpaceCreate(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+
+    @field_validator("id")
+    @classmethod
+    def _validate_id(cls, v: str):
+        if not v or not v.strip():
+            raise ValueError("ID is required")
+        v = v.strip().lower()
+        if not re.match(r"^[a-z0-9_-]+$", v):
+            raise ValueError(
+                "ID must contain only lowercase letters, numbers, hyphens, and underscores"
+            )
+        if len(v) > 50:
+            raise ValueError("ID too long (max 50 characters)")
+        return v
+
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, v: str):
+        if not v or not v.strip():
+            raise ValueError("Name is required")
+        v = v.strip()
+        if len(v) > 100:
+            raise ValueError("Name too long (max 100 characters)")
+        return v
+
+
+class SpaceSelectionRequest(BaseModel):
+    space_id: str
+
+    @field_validator("space_id")
+    @classmethod
+    def _validate_space_id(cls, v: str):
+        if not v or not v.strip():
+            raise ValueError("Space ID is required")
+        return v.strip().lower()
