@@ -153,6 +153,42 @@ def get_tree(request: Request, username: str = Depends(get_current_username)):
     return {"roots": roots, "members": list(members.values())}
 
 
+@router.get("/members", response_model=List[Member])
+def search_members(
+    request: Request,
+    username: str = Depends(get_current_username),
+    q: Optional[str] = None,
+    limit: int = 50,
+):
+    """Search for members in the current space. Used for spouse dropdown."""
+    _ensure_auth_header(request)
+    db = get_db()
+
+    # Get user's current space
+    space_id = _get_user_space(username)
+
+    # Base query for members in current space
+    members_query = db.collection("members").where("space_id", "==", space_id)
+
+    members_data = []
+    for doc in members_query.stream():
+        member = doc.to_dict() | {"id": doc.id}
+
+        # If search query provided, filter by name
+        if q:
+            full_name = f"{member.get('first_name', '')} {member.get('last_name', '')}".lower()
+            if q.lower() not in full_name:
+                continue
+
+        members_data.append(Member(**member))
+
+        # Apply limit
+        if len(members_data) >= limit:
+            break
+
+    return members_data
+
+
 def _snapshot_relations(db):
     # Return deterministic snapshot of relations for change detection
     rels = []
@@ -338,6 +374,30 @@ def backfill_versions(request: Request, username: str = Depends(get_current_user
     return {"updated": len(docs), "total": len(docs)}
 
 
+def _parse_hobbies(hobbies_input: Optional[List[str]]) -> List[str]:
+    """Parse and normalize hobbies from list or comma-separated strings."""
+    if not hobbies_input:
+        return []
+
+    normalized = []
+    for item in hobbies_input:
+        if isinstance(item, str):
+            # Split on commas and normalize
+            parts = [part.strip() for part in item.split(",")]
+            normalized.extend(parts)
+        else:
+            normalized.append(str(item))
+
+    # Remove empty strings and deduplicate while preserving order
+    result = []
+    for hobby in normalized:
+        cleaned = hobby.strip()
+        if cleaned and cleaned not in result:
+            result.append(cleaned)
+
+    return result
+
+
 @router.post("/members", response_model=Member)
 def create_member(
     member: CreateMember,
@@ -349,6 +409,26 @@ def create_member(
 
     # Get user's current space
     space_id = _get_user_space(username)
+
+    # Validate spouse_id if provided
+    if member.spouse_id:
+        # Cannot be themselves (we don't have the member ID yet, but this will be handled in mutual linking)
+        spouse_ref = db.collection("members").document(member.spouse_id)
+        spouse_doc = spouse_ref.get()
+
+        if not spouse_doc.exists:
+            raise HTTPException(status_code=404, detail="Spouse not found")
+
+        spouse_data = spouse_doc.to_dict() or {}
+
+        # Check spouse is in same space
+        if spouse_data.get("space_id") != space_id:
+            raise HTTPException(status_code=400, detail="Both members must be in the same space")
+
+        # Check if spouse already has a spouse (monogamy enforcement)
+        current_spouse_id = spouse_data.get("spouse_id")
+        if current_spouse_id:
+            raise HTTPException(status_code=409, detail="Selected member already has a spouse")
 
     # Check uniqueness within the space
     key = _name_key(member.first_name, member.last_name)
@@ -362,11 +442,19 @@ def create_member(
             status_code=409,
             detail="Member with same first_name and last_name already exists in this family space",
         )
+
     doc_ref = db.collection("members").document()
+
+    # Process and normalize hobbies
+    processed_hobbies = _parse_hobbies(member.hobbies)
+
     data = member.model_dump(exclude={"id"}) | {
         "name_key": key,
         "space_id": space_id,  # Associate member with space
+        "hobbies": processed_hobbies,  # Use processed hobbies
+        "created_by": username,  # Track who created the member
     }
+
     # derive timestamp field from MM/DD/YYYY and disallow future dates
     try:
         dob_dt = datetime.strptime(member.dob, "%m/%d/%Y").replace(tzinfo=timezone.utc)
@@ -379,16 +467,34 @@ def create_member(
     except Exception:
         # leave unparsed; tolerated by model, but dob_ts will be absent
         pass
+
     try:
+        # Create the member
         doc_ref.set(data)
         key_ref.set({"member_id": doc_ref.id, "space_id": space_id})
-    except Exception:
+
+        # Handle mutual spouse linking if spouse_id is provided
+        if member.spouse_id:
+            # Check that we're not trying to link to ourselves
+            if doc_ref.id == member.spouse_id:
+                raise HTTPException(status_code=400, detail="You can't select the same person")
+
+            # Set mutual spouse relationship
+            spouse_ref = db.collection("members").document(member.spouse_id)
+            spouse_ref.update({"spouse_id": doc_ref.id})
+
+    except Exception as e:
         # rollback key if member write fails
         try:
             key_ref.delete()
         except Exception:
             pass
-        raise
+        # If it's an HTTPException, re-raise it
+        if isinstance(e, HTTPException):
+            raise e
+        # Otherwise, wrap in a generic error
+        raise HTTPException(status_code=500, detail=f"Failed to create member: {str(e)}")
+
     return Member(id=doc_ref.id, **data)
 
 
@@ -417,6 +523,49 @@ def update_member(
         raise HTTPException(status_code=403, detail="Member not found in current family space")
 
     data = member.model_dump(exclude_unset=True)
+
+    # Validate spouse_id if provided
+    if "spouse_id" in data:
+        spouse_id = data["spouse_id"]
+
+        if spouse_id:
+            # Cannot be themselves
+            if spouse_id == member_id:
+                raise HTTPException(status_code=400, detail="You can't select the same person")
+
+            spouse_ref = db.collection("members").document(spouse_id)
+            spouse_doc = spouse_ref.get()
+
+            if not spouse_doc.exists:
+                raise HTTPException(status_code=404, detail="Spouse not found")
+
+            spouse_data = spouse_doc.to_dict() or {}
+
+            # Check spouse is in same space
+            if spouse_data.get("space_id") != space_id:
+                raise HTTPException(
+                    status_code=400, detail="Both members must be in the same space"
+                )
+
+            # Check if spouse already has a different spouse
+            current_spouse_id = spouse_data.get("spouse_id")
+            if current_spouse_id and current_spouse_id != member_id:
+                raise HTTPException(status_code=409, detail="Selected member already has a spouse")
+        # If spouse_id is None or empty string, we're clearing the spouse relationship
+        elif spouse_id == "" or spouse_id is None:
+            # Clear spouse relationship from current spouse if exists
+            current_spouse_id = current.get("spouse_id")
+            if current_spouse_id:
+                current_spouse_ref = db.collection("members").document(current_spouse_id)
+                current_spouse_doc = current_spouse_ref.get()
+                if current_spouse_doc.exists:
+                    current_spouse_ref.update({"spouse_id": None})
+            data["spouse_id"] = None
+
+    # Process hobbies if provided
+    if "hobbies" in data and data["hobbies"] is not None:
+        data["hobbies"] = _parse_hobbies(data["hobbies"])
+
     # If dob is present, recompute dob_ts
     if "dob" in data and data.get("dob"):
         try:
@@ -463,6 +612,12 @@ def update_member(
                 pass
     else:
         ref.update(data)
+
+    # Handle mutual spouse linking if spouse_id was updated
+    if "spouse_id" in data and data["spouse_id"]:
+        spouse_ref = db.collection("members").document(data["spouse_id"])
+        spouse_ref.update({"spouse_id": member_id})
+
     new = ref.get().to_dict()
     return Member(id=member_id, **{k: v for k, v in new.items() if k != "id"})
 
