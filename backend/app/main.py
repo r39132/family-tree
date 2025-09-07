@@ -8,6 +8,7 @@ from .routes_admin import router as admin_router
 from .routes_auth import router as auth_router
 from .routes_events import router as events_router
 from .routes_tree import router as tree_router
+from .routes_user import router as user_router
 
 app = FastAPI(
     title=settings.app_name,
@@ -43,6 +44,7 @@ app.include_router(auth_router)
 app.include_router(tree_router)
 app.include_router(events_router)
 app.include_router(admin_router)
+app.include_router(user_router)
 
 
 @app.get("/healthz")

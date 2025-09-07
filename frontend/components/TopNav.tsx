@@ -14,6 +14,7 @@ type UserInfo = {
   username: string;
   email: string;
   roles?: string[];
+  profile_photo_data_url?: string;
 };
 
 type AppConfig = {
@@ -36,8 +37,8 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
       setAuthed(isAuthenticated);
 
       if (isAuthenticated) {
-        // Fetch user info
-        api('/auth/me')
+        // Fetch user profile (includes roles and optional photo)
+        api('/user/profile')
           .then(data => setUserInfo(data))
           .catch(err => {
             console.error('Failed to fetch user info:', err);
@@ -120,7 +121,11 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
                 ...(dropdownOpen && { borderColor: '#007bff' })
               }}
             >
-              👤
+              {userInfo.profile_photo_data_url ? (
+                <img src={userInfo.profile_photo_data_url} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              ) : (
+                <span>👤</span>
+              )}
             </div>
 
             {dropdownOpen && (
@@ -140,17 +145,39 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
                   overflow: 'hidden'
                 }}
               >
-                <div
+                <Link
+                  href="/profile"
+                  onClick={() => setDropdownOpen(false)}
                   style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
                     padding: '12px 16px',
                     borderBottom: '1px solid #eee',
                     color: '#333',
                     fontSize: '14px',
-                    fontWeight: '500'
+                    fontWeight: 500,
+                    textDecoration: 'none'
                   }}
                 >
-                  {userInfo.username}
-                </div>
+                  <span
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: '50%',
+                      overflow: 'hidden',
+                      background: '#f2f2f2',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '1px solid #ddd'
+                    }}
+                  >
+                    {/* Placeholder avatar; actual photo rendered on profile page */}
+                    👤
+                  </span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{userInfo.username}</span>
+                </Link>
                 {userInfo?.roles?.includes('admin') && (
                   <Link
                     href="/admin"
