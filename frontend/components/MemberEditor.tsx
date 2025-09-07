@@ -9,12 +9,56 @@ type Props = {
   formId?: string;
   externalErrors?: Record<string,string>;
   config?: any;
+  onChangesDetected?: (hasChanges: boolean) => void;
 };
 
-export default function MemberEditor({member, onSave, requireBasics=false, hideSubmit=false, formId='member-form', externalErrors = {}, config = {}}: Props){
+export default function MemberEditor({member, onSave, requireBasics=false, hideSubmit=false, formId='member-form', externalErrors = {}, config = {}, onChangesDetected}: Props){
   const [m,setM]=useState({...member});
   const [errors, setErrors] = useState<Record<string,string>>({});
+  const [hobbiesInput, setHobbiesInput] = useState<string>(() => {
+    // Initialize hobbies input as a comma-separated string
+    return Array.isArray(member.hobbies) ? member.hobbies.join(', ') : '';
+  });
   const router = useRouter();
+
+  function parseHobbies(input: string): string[] {
+    if (!input || !input.trim()) return [];
+    return input.split(',')
+      .map(hobby => hobby.trim())
+      .filter(hobby => hobby.length > 0);
+  }
+
+  // Function to compare if current state differs from original member
+  function hasChanges(): boolean {
+    // Compare form fields with original member
+    const currentHobbies = parseHobbies(hobbiesInput);
+    const originalHobbies = Array.isArray(member.hobbies) ? member.hobbies : [];
+
+    // Helper to normalize values for comparison
+    const normalize = (val: any) => val || '';
+
+    return (
+      normalize(m.first_name) !== normalize(member.first_name) ||
+      normalize(m.nick_name) !== normalize(member.nick_name) ||
+      normalize(m.middle_name) !== normalize(member.middle_name) ||
+      normalize(m.last_name) !== normalize(member.last_name) ||
+      normalize(m.dob) !== normalize(member.dob) ||
+      normalize(m.birth_location) !== normalize(member.birth_location) ||
+      normalize(m.residence_location) !== normalize(member.residence_location) ||
+      normalize(m.email) !== normalize(member.email) ||
+      normalize(m.phone) !== normalize(member.phone) ||
+      !!m.is_deceased !== !!member.is_deceased ||
+      JSON.stringify(currentHobbies.sort()) !== JSON.stringify(originalHobbies.sort())
+    );
+  }
+
+  // Track changes and notify parent component
+  useEffect(() => {
+    if (onChangesDetected) {
+      onChangesDetected(hasChanges());
+    }
+  }, [m, hobbiesInput, onChangesDetected]);
+
   function ch(k:string,v:any){ setM((p:any)=>({...p,[k]:v})); }
   const nameRe = useMemo(()=>/^[A-Za-z-]+$/,[]);
   const dobRe = useMemo(()=>/^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/ ,[]);
@@ -72,7 +116,13 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
 
   function save(e:any){
     e.preventDefault();
-    const base = validate(m);
+    // Parse hobbies from the input string before validation/saving
+    const memberWithParsedHobbies = {
+      ...m,
+      hobbies: parseHobbies(hobbiesInput)
+    };
+
+    const base = validate(memberWithParsedHobbies);
     const merged: Record<string,string> = { ...base };
     for(const [k,v] of Object.entries(externalErrors || {})){
       if(k === 'email' && !base.email){
@@ -82,7 +132,7 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
     }
     setErrors(merged);
     if(Object.keys(merged).length>0) return;
-    onSave(m);
+    onSave(memberWithParsedHobbies);
   }
   return (
   <form id={formId} onSubmit={save}>
@@ -117,7 +167,19 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
     </label>
   <label>Email<input className="input" type="email" placeholder="Email" value={m.email||''} onChange={e=>ch('email',e.target.value)}/>{errors.email && <span className="error">{errors.email}</span>}</label>
     <label>Phone<input className="input" placeholder="Phone" value={m.phone||''} onChange={e=>ch('phone',e.target.value)}/></label>
-  <label>Hobbies (comma-separated)<input className="input" placeholder="e.g., Reading, Hiking" value={(m.hobbies||[]).join(', ')} onChange={e=>ch('hobbies', e.target.value.split(',').map((s:string)=>s.trim()).filter(Boolean))}/></label>
+  <label>Hobbies (comma-separated)
+    <input
+      className="input"
+      placeholder="e.g., Reading, Hiking, Cooking"
+      value={hobbiesInput}
+      onChange={e=>setHobbiesInput(e.target.value)}
+    />
+    {hobbiesInput && (
+      <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+        Preview: {parseHobbies(hobbiesInput).join(' • ')}
+      </div>
+    )}
+  </label>
   <label><input type="checkbox" checked={!!m.is_deceased} onChange={e=>ch('is_deceased', e.target.checked)} /> Deceased</label>
       </div>
       {!hideSubmit && (

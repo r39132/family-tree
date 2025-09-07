@@ -14,6 +14,11 @@ export default function AddMemberPage(){
   const [showInvalid, setShowInvalid] = useState(false);
   const [invalidMsgs, setInvalidMsgs] = useState<string[]>([]);
   const [config, setConfig] = useState<any>({ enable_map: false });
+  const [allMembers, setAllMembers] = useState<any[]>([]);
+  const [treeData, setTreeData] = useState<any>({ roots: [], members: [] });
+  const [spouseId, setSpouseId] = useState<string>('');
+  const [hasFormChanges, setHasFormChanges] = useState(false);
+  const [hasSpouseChange, setHasSpouseChange] = useState(false);
 
   useEffect(() => {
     async function loadConfig() {
@@ -27,10 +32,54 @@ export default function AddMemberPage(){
     loadConfig();
   }, []);
 
+  useEffect(() => {
+    async function loadTreeData() {
+      try {
+        const tree = await api('/tree');
+        setTreeData(tree);
+        setAllMembers(tree.members || []);
+      } catch (e) {
+        console.error('Failed to load tree data:', e);
+      }
+    }
+    loadTreeData();
+  }, []);
+
+  // Helper function to get all member IDs that are part of the tree structure
+  function getMembersInTree(roots: any[]): Set<string> {
+    const membersInTree = new Set<string>();
+
+    function addNodeMembers(node: any) {
+      if (node.member?.id) {
+        membersInTree.add(node.member.id);
+      }
+      if (node.spouse?.id) {
+        membersInTree.add(node.spouse.id);
+      }
+      if (node.children) {
+        node.children.forEach(addNodeMembers);
+      }
+    }
+
+    roots.forEach(addNodeMembers);
+    return membersInTree;
+  }
+
+  // Track spouse changes
+  useEffect(() => {
+    setHasSpouseChange(spouseId !== '');
+  }, [spouseId]);
+
+  // Check if there are any changes overall
+  const hasChanges = hasFormChanges || hasSpouseChange;
+
   async function onSave(m:any){
     try{
-  const body = normalizePayload(titleCaseAll(m));
-  await api('/tree/members', { method:'POST', body: JSON.stringify(body) });
+      const body = normalizePayload(titleCaseAll({
+        ...m,
+        spouse_id: spouseId || undefined
+      }));
+      await api('/tree/members', { method:'POST', body: JSON.stringify(body) });
 
       // Invalidate tree cache since we added a new member
       const cacheManager = TreeCacheManager.getInstance();
@@ -94,21 +143,54 @@ export default function AddMemberPage(){
       <div className="card">
         <h2>Add member</h2>
         {error && <p style={{color:'crimson'}}>{error}</p>}
-  <MemberEditor member={member} externalErrors={fieldErrors} config={config} onSave={(m:any)=>{
-          // MemberEditor won't call onSave if invalid (button disabled), but if form submit is forced, gate it here
-          // Client-side validation already runs inside MemberEditor; we can double-check minimal keys
-          const errs: string[] = [];
-          if(!m.first_name?.trim()) errs.push('First name is required.');
-          if(!m.last_name?.trim()) errs.push('Last name is required.');
-          if(!m.dob?.trim()) errs.push('Date of Birth is required.');
-          if(errs.length){ setInvalidMsgs(errs); setShowInvalid(true); return; }
-          onSave(m);
-        }} requireBasics hideSubmit formId="add-member-form" />
+        <MemberEditor
+          member={member}
+          externalErrors={fieldErrors}
+          config={config}
+          onChangesDetected={setHasFormChanges}
+          onSave={(m:any)=>{
+            // MemberEditor won't call onSave if invalid (button disabled), but if form submit is forced, gate it here
+            // Client-side validation already runs inside MemberEditor; we can double-check minimal keys
+            const errs: string[] = [];
+            if(!m.first_name?.trim()) errs.push('First name is required.');
+            if(!m.last_name?.trim()) errs.push('Last name is required.');
+            if(!m.dob?.trim()) errs.push('Date of Birth is required.');
+            if(errs.length){ setInvalidMsgs(errs); setShowInvalid(true); return; }
+            onSave(m);
+          }}
+          requireBasics
+          hideSubmit
+          formId="add-member-form"
+        />
+        <div style={{marginTop:12}}>
+          <label>Spouse/Partner
+            <select className="input" value={spouseId} onChange={e=>setSpouseId(e.target.value)}>
+              <option value="">(None)</option>
+              {(() => {
+                const membersInTree = getMembersInTree(treeData.roots || []);
+                return allMembers.filter(m =>
+                  !m.spouse_id && // Not already married
+                  !membersInTree.has(m.id) // Not part of the family tree structure
+                ).map((m:any)=>(
+                  <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
+                ));
+              })()}
+            </select>
+          </label>
+        </div>
         <div className="bottombar">
           <div className="bottombar-left"></div>
           <div className="bottombar-right">
             <button className="btn secondary" onClick={()=>router.push('/')}>Cancel</button>
-            <button className="btn" type="submit" form="add-member-form">Save</button>
+            <button
+              className="btn"
+              type="submit"
+              form="add-member-form"
+              disabled={!hasChanges}
+              title={!hasChanges ? 'No changes to save' : 'Save member'}
+            >
+              Save
+            </button>
           </div>
         </div>
       </div>
