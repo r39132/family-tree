@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 from app.config import Settings
 
@@ -63,3 +64,14 @@ def test_settings_defaults_when_missing_env(monkeypatch: pytest.MonkeyPatch):
     assert s.use_email_in_dev is True
     assert s.smtp_port == 587
     assert s.access_token_expire_minutes == 60
+
+    def test_settings_whitespace_values_raise(monkeypatch: pytest.MonkeyPatch):
+        """Reproduce bug: whitespace around boolean/int strings causes validation error."""
+        monkeypatch.setenv("ENABLE_MAP", " true ")
+        monkeypatch.setenv("USE_EMAIL_IN_DEV", " false ")
+        monkeypatch.setenv("DEBUG", " false ")
+        monkeypatch.setenv("SMTP_PORT", " 587 ")
+        monkeypatch.setenv("ACCESS_TOKEN_EXPIRE_MINUTES", " 120 ")
+
+        with pytest.raises(ValidationError):
+            Settings(_env_file=None)

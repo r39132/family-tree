@@ -207,10 +207,13 @@ jobs:
             --set-env-vars "${SET_ENV_VARS}"
 
       - name: Print Cloud Run URL
+        shell: bash
+        env:
+          SERVICE_NAME: ${{ secrets.CLOUD_RUN_SERVICE }}
+          REGION: ${{ secrets.CLOUD_RUN_REGION }}
         run: |
-          URL=$(gcloud run services describe ${{ secrets.CLOUD_RUN_SERVICE }} \
-            --region ${{ secrets.CLOUD_RUN_REGION }} \
-            --format='value(status.url)')
+          set -euo pipefail
+          URL=$(gcloud run services describe "${SERVICE_NAME}" --region "${REGION}" --format='value(status.url)')
           echo "Service is live at: $URL"
 
   frontend-deploy:
@@ -245,10 +248,13 @@ jobs:
         run: gcloud auth configure-docker ${{ secrets.GAR_LOCATION }}-docker.pkg.dev
 
       - name: Get backend URL
+        shell: bash
+        env:
+          SERVICE_NAME: ${{ secrets.CLOUD_RUN_SERVICE }}
+          REGION: ${{ secrets.CLOUD_RUN_REGION }}
         run: |
-          BACKEND_URL=$(gcloud run services describe ${{ secrets.CLOUD_RUN_SERVICE }} \
-            --region ${{ secrets.CLOUD_RUN_REGION }} \
-            --format='value(status.url)')
+          set -euo pipefail
+          BACKEND_URL=$(gcloud run services describe "${SERVICE_NAME}" --region "${REGION}" --format='value(status.url)')
           echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
 
       - name: Build & push frontend image
