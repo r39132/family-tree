@@ -161,6 +161,26 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Validate and clean service name to avoid Cloud Run name errors
+          SERVICE_NAME_CLEAN=$(printf '%s' "$SERVICE_NAME" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          # Checks: lowercase letters, digits, hyphens; start with letter; not end with hyphen; length <= 63
+          if printf '%s' "$SERVICE_NAME_CLEAN" | grep -q '[A-Z]'; then
+            echo "Invalid CLOUD_RUN_SERVICE: '$SERVICE_NAME' -> contains uppercase. Use lowercase letters, digits, and hyphens only." >&2
+            exit 1
+          fi
+          if ! printf '%s' "$SERVICE_NAME_CLEAN" | grep -Eq '^[a-z][a-z0-9-]*$'; then
+            echo "Invalid CLOUD_RUN_SERVICE: '$SERVICE_NAME' -> must start with a letter and contain only lowercase, digits, and hyphens." >&2
+            exit 1
+          fi
+          if printf '%s' "$SERVICE_NAME_CLEAN" | grep -Eq '--$'; then
+            echo "Invalid CLOUD_RUN_SERVICE: '$SERVICE_NAME' -> may not end with a hyphen." >&2
+            exit 1
+          fi
+          if [ ${#SERVICE_NAME_CLEAN} -gt 63 ]; then
+            echo "Invalid CLOUD_RUN_SERVICE: '$SERVICE_NAME' -> length ${#SERVICE_NAME_CLEAN} exceeds 63 characters." >&2
+            exit 1
+          fi
+
           # Helper to trim leading/trailing whitespace
           clean() { printf '%s' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
 
@@ -179,7 +199,7 @@ jobs:
           SET_ENV_VARS="^|^GOOGLE_CLOUD_PROJECT=${GCP_PROJECT}|FIRESTORE_DATABASE=family-tree|ENABLE_MAP=${ENABLE_MAP}|GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}|FRONTEND_URL=${FRONTEND_URL}|SMTP_HOST=${SMTP_HOST}|SMTP_PORT=${SMTP_PORT}|SMTP_USER=${SMTP_USER}|SMTP_PASSWORD=${SMTP_PASSWORD}|EMAIL_FROM=${EMAIL_FROM}|EMAIL_FROM_NAME=${EMAIL_FROM_NAME}|USE_EMAIL_IN_DEV=true"
 
           # Deploy
-          gcloud run deploy "${SERVICE_NAME}" \
+          gcloud run deploy "${SERVICE_NAME_CLEAN}" \
             --image "${IMAGE}" \
             --region "${REGION}" \
             --platform managed \
