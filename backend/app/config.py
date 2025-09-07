@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     debug: bool = Field(default=True, alias="DEBUG")
 
     google_cloud_project: str = Field(default="local-dev", alias="GOOGLE_CLOUD_PROJECT")
-    firestore_database: str = Field(default="(default)", alias="FIRESTORE_DATABASE")
+    firestore_database: str = Field(default="family-tree", alias="FIRESTORE_DATABASE")
 
     jwt_secret: str = Field(default="dev-secret", alias="JWT_SECRET")
     jwt_alg: str = Field(default="HS256", alias="JWT_ALG")

@@ -15,6 +15,7 @@ type UserInfo = {
   email: string;
   roles?: string[];
   profile_photo_data_url?: string;
+  current_space?: string;
 };
 
 type AppConfig = {
@@ -22,10 +23,18 @@ type AppConfig = {
   require_invite: boolean;
 };
 
+type FamilySpace = {
+  id: string;
+  name: string;
+  description?: string;
+};
+
 export default function TopNav({ showBack=true, showAdd=true, showInvite=true, showLogout=true }: Props){
   const router = useRouter();
   const [authed, setAuthed] = useState(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const [currentSpace, setCurrentSpace] = useState<FamilySpace | null>(null);
+  const [availableSpaces, setAvailableSpaces] = useState<FamilySpace[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [config, setConfig] = useState<AppConfig>({ enable_map: false, require_invite: true });
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -37,9 +46,17 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
       setAuthed(isAuthenticated);
 
       if (isAuthenticated) {
-        // Fetch user profile (includes roles and optional photo)
+        // Fetch user profile (includes roles, optional photo, and current_space)
         api('/user/profile')
-          .then(data => setUserInfo(data))
+          .then(data => {
+            setUserInfo(data);
+            // Fetch current space details if user has one
+            if (data.current_space) {
+              api(`/spaces/${data.current_space}`)
+                .then(space => setCurrentSpace(space))
+                .catch(err => console.error('Failed to fetch current space:', err));
+            }
+          })
           .catch(err => {
             console.error('Failed to fetch user info:', err);
             // If token is invalid, log out
@@ -47,6 +64,11 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
               logout();
             }
           });
+
+        // Fetch available spaces
+        api('/spaces')
+          .then(spaces => setAvailableSpaces(spaces))
+          .catch(err => console.error('Failed to fetch spaces:', err));
 
         // Fetch app configuration
         api('/config')
@@ -56,9 +78,7 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
           });
       }
     }
-  },[]);
-
-  // Close dropdown when clicking outside
+  },[]);   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -84,6 +104,27 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
   function toggleDropdown() {
     setDropdownOpen(!dropdownOpen);
   }
+
+  async function switchSpace(spaceId: string) {
+    try {
+      await api('/auth/space', {
+        method: 'POST',
+        body: JSON.stringify({ space_id: spaceId })
+      });
+
+      // Update current space
+      const newSpace = availableSpaces.find(s => s.id === spaceId);
+      if (newSpace) {
+        setCurrentSpace(newSpace);
+        setUserInfo(prev => prev ? { ...prev, current_space: spaceId } : null);
+      }
+
+      // Refresh the page to reload data for new space
+      window.location.reload();
+    } catch (err) {
+      console.error('Failed to switch space:', err);
+    }
+  }
   return (
     <div className="topbar">
       <div className="topbar-left">
@@ -97,7 +138,20 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
         )}
       </div>
       <div className="topbar-center">
-        <Link href="/" className="brand">🌳 Family Tree</Link>
+        <Link href="/" className="brand">
+          🌳 Family Tree
+          {authed && currentSpace && (
+            <span style={{
+              fontSize: '18px',
+              fontWeight: 'bold',
+              marginLeft: '3px'
+            }}>
+              <span style={{ color: 'black' }}>(</span>
+              <span style={{ color: '#2e7d32' }}>{currentSpace.name}</span>
+              <span style={{ color: 'black' }}>)</span>
+            </span>
+          )}
+        </Link>
       </div>
       <div className="topbar-right">
         {authed && userInfo && (
@@ -227,6 +281,50 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
                   >
                     Invite
                   </Link>
+                )}
+                {/* Family Space Switcher */}
+                {availableSpaces.length > 1 && (
+                  <div style={{ borderTop: '1px solid #eee', padding: '8px 0' }}>
+                    <div style={{ padding: '4px 16px', fontSize: '12px', fontWeight: '600', color: '#666', textTransform: 'uppercase' }}>
+                      Family Space
+                    </div>
+                    {availableSpaces.map(space => (
+                      <button
+                        key={space.id}
+                        onClick={() => {
+                          if (space.id !== currentSpace?.id) {
+                            switchSpace(space.id);
+                          }
+                          setDropdownOpen(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '8px 16px',
+                          border: 'none',
+                          backgroundColor: space.id === currentSpace?.id ? '#f0f8ff' : 'transparent',
+                          color: space.id === currentSpace?.id ? '#0066cc' : '#333',
+                          fontSize: '14px',
+                          textAlign: 'left',
+                          cursor: space.id === currentSpace?.id ? 'default' : 'pointer',
+                          transition: 'background-color 0.2s ease',
+                          fontWeight: space.id === currentSpace?.id ? '600' : 'normal'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (space.id !== currentSpace?.id) {
+                            e.currentTarget.style.backgroundColor = '#f8f9fa';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (space.id !== currentSpace?.id) {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }
+                        }}
+                      >
+                        {space.name}
+                        {space.id === currentSpace?.id && ' ✓'}
+                      </button>
+                    ))}
+                  </div>
                 )}
                 {showLogout && (
                   <button

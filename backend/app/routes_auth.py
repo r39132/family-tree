@@ -21,11 +21,25 @@ from .models import (
     LoginRequest,
     RegisterRequest,
     ResetRequest,
+    SpaceSelectionRequest,
     TokenResponse,
 )
 from .utils.time import utc_now
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _get_user_space(username: str) -> str:
+    """Get the current space for a user. Returns 'demo' as fallback."""
+    db = get_db()
+    user_ref = db.collection("users").document(username)
+    user_doc = user_ref.get()
+
+    if not user_doc.exists:
+        return "demo"  # Default fallback
+
+    data = user_doc.to_dict()
+    return data.get("current_space", "demo")
 
 
 def send_mail(to_email: str, subject: str, body: str):
@@ -138,12 +152,27 @@ def register(payload: RegisterRequest):
     print("Creating user account...")
     import time
 
+    # Determine the space for the user
+    if settings.require_invite and invite_data:
+        # Use the space from the invite
+        space_id = invite_data.get("space_id", "demo")
+    else:
+        # Use user-selected space or default to demo
+        space_id = payload.space_id or "demo"
+
+    # Validate that the space exists
+    space_ref = db.collection("family_spaces").document(space_id)
+    if not space_ref.get().exists:
+        # If space doesn't exist, fall back to demo
+        space_id = "demo"
+
     user_ref.set(
         {
             "email": payload.email,
             "password_hash": hash_password(payload.password),
             "created_at": int(time.time()),  # Epoch seconds
             "invite_code_used": payload.invite_code,
+            "current_space": space_id,  # Associate user with selected space
             # role & session fields
             "roles": [],
             "sessions_invalid_after": None,
@@ -153,7 +182,7 @@ def register(payload: RegisterRequest):
             "login_count": 0,
         }
     )
-    print(f"✅ User {payload.username} created successfully")
+    print(f"✅ User {payload.username} created successfully in space {space_id}")
 
     if settings.require_invite:
         print("Marking invite as used...")
@@ -241,6 +270,18 @@ def login(payload: LoginRequest):
             detail="Your account has been evicted. Please contact an administrator.",
         )
 
+    # Handle space selection if provided
+    if payload.space_id:
+        # Validate that the space exists
+        space_ref = db.collection("family_spaces").document(payload.space_id)
+        if not space_ref.get().exists:
+            raise HTTPException(status_code=400, detail="Selected family space not found")
+
+        # Update user's current space
+        db.collection("users").document(payload.username).update(
+            {"current_space": payload.space_id}
+        )
+
     # Issue token and update login stats with epoch timestamps
     import time
 
@@ -273,7 +314,27 @@ def get_current_user(current_user: str = Depends(get_current_username)):
         "email": data.get("email"),
         "created_at": data.get("created_at"),
         "roles": data.get("roles", []),
+        "current_space": data.get("current_space", "demo"),
     }
+
+
+@router.post("/space")
+def switch_space(
+    space_request: SpaceSelectionRequest, current_user: str = Depends(get_current_username)
+):
+    """Switch the current user's family space"""
+    db = get_db()
+
+    # Validate that the space exists
+    space_ref = db.collection("family_spaces").document(space_request.space_id)
+    if not space_ref.get().exists:
+        raise HTTPException(status_code=400, detail="Family space not found")
+
+    # Update user's current space
+    user_ref = db.collection("users").document(current_user)
+    user_ref.update({"current_space": space_request.space_id})
+
+    return {"message": "Family space updated successfully", "current_space": space_request.space_id}
 
 
 @router.post("/forgot")
@@ -322,6 +383,7 @@ def create_invite(count: int = 1, current_user: str = Depends(get_current_userna
     if not settings.require_invite:
         raise HTTPException(status_code=400, detail="Invites are disabled")
     db = get_db()
+    space_id = _get_user_space(current_user)
     # Note: Eviction is already enforced in get_current_username dependency
     if count < 1 or count > 10:
         raise HTTPException(status_code=400, detail="count must be between 1 and 10")
@@ -332,6 +394,7 @@ def create_invite(count: int = 1, current_user: str = Depends(get_current_userna
             {
                 "active": True,
                 "created_by": current_user,
+                "space_id": space_id,
                 "created_at": firestore.SERVER_TIMESTAMP,
             }
         )
@@ -342,7 +405,10 @@ def create_invite(count: int = 1, current_user: str = Depends(get_current_userna
 @router.get("/invites")
 def list_invites(view: str = "all", current_user: str = Depends(get_current_username)):
     db = get_db()
-    docs = db.collection("invites").stream()
+    space_id = _get_user_space(current_user)
+
+    # Only show invites for the current space
+    docs = db.collection("invites").where("space_id", "==", space_id).stream()
     items = []
     for d in docs:
         data = d.to_dict() or {}
@@ -356,6 +422,7 @@ def list_invites(view: str = "all", current_user: str = Depends(get_current_user
             "used_at": data.get("used_at"),
             "sent_email": data.get("sent_email"),
             "sent_at": data.get("sent_at"),
+            "space_id": data.get("space_id"),
         }
         items.append(item)
     v = (view or "all").lower()
