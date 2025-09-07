@@ -8,6 +8,7 @@ from .deps import get_current_username
 from .firestore_client import get_db
 from .models import EventNotificationSettings, EventsResponse, FamilyEvent
 from .routes_auth import send_mail
+from .utils.time import utc_now
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -51,10 +52,10 @@ def get_all_year_events(
 ) -> tuple[List[FamilyEvent], List[FamilyEvent]]:
     """Get all family events for a given year, split into upcoming and past events."""
     if year is None:
-        year = datetime.now().year
+        year = utc_now().year
 
     events = []
-    today = datetime.now()
+    today = utc_now()
 
     for member in members:
         if not member.get("dob"):
@@ -181,7 +182,7 @@ def send_event_reminders():
 
     # Get events happening in next 2 days
     upcoming_events, _ = get_all_year_events(members)
-    today = datetime.now()
+    today = utc_now()
     near_future = today + timedelta(days=2)
 
     # Filter to events within 48 hours

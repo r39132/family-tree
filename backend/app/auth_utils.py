@@ -5,6 +5,7 @@ from jose import jwt
 from passlib.context import CryptContext
 
 from .config import settings
+from .utils.time import utc_now
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -18,14 +19,14 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def create_access_token(subject: str, expires_minutes: Optional[int] = None) -> str:
-    now = dt.datetime.utcnow()
+    now = utc_now()
     expire = now + dt.timedelta(minutes=expires_minutes or settings.access_token_expire_minutes)
     to_encode = {"sub": subject, "exp": expire, "iat": now}
     return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_alg)
 
 
 def create_reset_token(username: str, minutes: int = 30) -> str:
-    expire = dt.datetime.utcnow() + dt.timedelta(minutes=minutes)
+    expire = utc_now() + dt.timedelta(minutes=minutes)
     return jwt.encode(
         {"sub": username, "exp": expire, "kind": "reset"},
         settings.jwt_secret,

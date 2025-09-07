@@ -1,10 +1,10 @@
-from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from .deps import get_current_username
 from .firestore_client import get_db
+from .utils.time import to_iso_string, utc_now
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -27,7 +27,7 @@ def log_admin_action(actor: str, action: str, target: str, extra: dict | None = 
         "actor": actor,
         "action": action,
         "target": target,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": to_iso_string(utc_now()),
     }
     if extra:
         payload.update({f"extra_{k}": v for k, v in extra.items()})
@@ -66,9 +66,7 @@ def evict_user(user_id: str, admin: str = Depends(require_admin)):
     import time
 
     evicted_at = int(time.time())
-    ref.update(
-        {"sessions_invalid_after": datetime.now(timezone.utc).isoformat(), "evicted_at": evicted_at}
-    )
+    ref.update({"sessions_invalid_after": to_iso_string(utc_now()), "evicted_at": evicted_at})
     log_admin_action(admin, "evict", user_id, {"evicted_at": evicted_at})
     return {"ok": True}
 

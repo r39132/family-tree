@@ -30,3 +30,22 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-push]
+      - id: forbid-naive-datetime
+        name: Forbid naive datetime usage
+        entry: bash
+        args:
+          - -c
+          - |
+            # Check for naive datetime usage in backend code (excluding comments, docstrings, and binary files)
+            if grep -r --line-number --exclude-dir="__pycache__" "datetime\.utcnow(" backend/app/ | grep -v "Replacement for datetime.utcnow" | grep -v "#.*datetime\.utcnow"; then
+              echo "ERROR: Found datetime.utcnow() usage. Use app.utils.time.utc_now() instead."
+              exit 1
+            fi
+            if grep -r --line-number --exclude-dir="__pycache__" "datetime\.now()" backend/app/ | grep -v "timezone.utc" | grep -v "tz=timezone.utc" | grep -v "#.*datetime\.now"; then
+              echo "ERROR: Found naive datetime.now() usage. Use app.utils.time.utc_now() instead."
+              exit 1
+            fi
+            echo "✓ No naive datetime usage found"
+        language: system
+        files: ^backend/app/.*\.py$
+        stages: [pre-commit]

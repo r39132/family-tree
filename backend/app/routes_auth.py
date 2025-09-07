@@ -23,6 +23,7 @@ from .models import (
     ResetRequest,
     TokenResponse,
 )
+from .utils.time import utc_now
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -521,7 +522,7 @@ def public_email_invite_link(code: str, payload: dict):
         else:
             sent_datetime = sent_at
 
-        time_diff = datetime.now(tz=timezone.utc) - sent_datetime
+        time_diff = utc_now() - sent_datetime
         print(f"Time since last send: {time_diff}")
 
         if time_diff < timedelta(hours=1):

@@ -1,5 +1,3 @@
-from datetime import datetime, timezone
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,6 +7,7 @@ from .routes_auth import router as auth_router
 from .routes_events import router as events_router
 from .routes_tree import router as tree_router
 from .routes_user import router as user_router
+from .utils.time import to_iso_string, utc_now
 
 app = FastAPI(
     title=settings.app_name,
@@ -54,7 +53,7 @@ def health():
         "status": "ok",
         "version": settings.app_version,
         "message": "Health endpoint is working!",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": to_iso_string(utc_now()),
     }
 
 
