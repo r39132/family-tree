@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: backend-ci
     permissions:
-      contents: write   # needed to commit docs/coverage.svg
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,27 +46,21 @@ jobs:
         with:
           python-version: "3.12"
 
-      # install uv only; avoid global installs (PEP 668 on runners)
       - name: Install uv
         run: python -m pip install --upgrade pip uv
 
-      # create a venv inside backend/ and install deps within it
       - name: Create venv & sync deps
         working-directory: backend
         run: |
           uv venv --python 3.12
-          # Install project deps (if pyproject/uv.lock exist)
           uv sync || true
-          # Ensure test & badge tools are present in the venv
           uv pip install -U pytest pytest-cov genbadge[coverage]
 
       - name: Run tests with coverage (from backend/)
         working-directory: backend
         run: |
-          # Run tests with coverage requirement (60% minimum)
           uv run pytest -q --cov=app --cov-report=xml --cov-fail-under=60
           test -f coverage.xml
-          echo "Coverage report generated successfully"
 
       - name: Generate SVG badge at repo root
         working-directory: backend
@@ -74,7 +68,6 @@ jobs:
           mkdir -p ../docs
           uv run genbadge coverage -i coverage.xml -o ../docs/coverage.svg
           ls -l ../docs/coverage.svg
-          echo "Coverage badge generated successfully"
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v4
@@ -90,13 +83,10 @@ jobs:
           set -e
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Stage the badge (handles first-time add and updates)
           git add -A docs/coverage.svg
-          # Commit only if something changed in the index
           if git diff --cached --quiet; then
             echo "No badge change detected."
           else
-            echo "Badge updated, committing changes."
             git commit -m "chore(ci): update coverage badge [skip ci]"
             git push
           fi
@@ -161,27 +151,18 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Validate and clean service name to avoid Cloud Run name errors
+          # Validate/clean service name
           SERVICE_NAME_CLEAN=$(printf '%s' "$SERVICE_NAME" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-          # Checks: lowercase letters, digits, hyphens; start with letter; not end with hyphen; length <= 63
           if printf '%s' "$SERVICE_NAME_CLEAN" | grep -q '[A-Z]'; then
-            echo "Invalid CLOUD_RUN_SERVICE: '$SERVICE_NAME' -> contains uppercase. Use lowercase letters, digits, and hyphens only." >&2
-            exit 1
-          fi
+            echo "Invalid CLOUD_RUN_SERVICE: '$SERVICE_NAME' (uppercase not allowed)"; exit 1; fi
           if ! printf '%s' "$SERVICE_NAME_CLEAN" | grep -Eq '^[a-z][a-z0-9-]*$'; then
-            echo "Invalid CLOUD_RUN_SERVICE: '$SERVICE_NAME' -> must start with a letter and contain only lowercase, digits, and hyphens." >&2
-            exit 1
-          fi
+            echo "Invalid CLOUD_RUN_SERVICE: '$SERVICE_NAME' (must start with a letter and use [a-z0-9-])"; exit 1; fi
           if printf '%s' "$SERVICE_NAME_CLEAN" | grep -Eq '--$'; then
-            echo "Invalid CLOUD_RUN_SERVICE: '$SERVICE_NAME' -> may not end with a hyphen." >&2
-            exit 1
-          fi
+            echo "Invalid CLOUD_RUN_SERVICE: '$SERVICE_NAME' (may not end with '-')"; exit 1; fi
           if [ ${#SERVICE_NAME_CLEAN} -gt 63 ]; then
-            echo "Invalid CLOUD_RUN_SERVICE: '$SERVICE_NAME' -> length ${#SERVICE_NAME_CLEAN} exceeds 63 characters." >&2
-            exit 1
-          fi
+            echo "Invalid CLOUD_RUN_SERVICE length ${#SERVICE_NAME_CLEAN} > 63"; exit 1; fi
 
-          # Helper to trim leading/trailing whitespace
+          # Trim helper
           clean() { printf '%s' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
 
           GCP_PROJECT=$(clean "$ENV_GCP_PROJECT_ID")
@@ -195,25 +176,47 @@ jobs:
           EMAIL_FROM=$(clean "$ENV_EMAIL_FROM")
           EMAIL_FROM_NAME=$(clean "$ENV_EMAIL_FROM_NAME")
 
-          # Compose env vars with a custom delimiter (^|^) to avoid comma/space parsing issues
+          # Compose env vars with custom delimiter to avoid comma parsing
           SET_ENV_VARS="^|^GOOGLE_CLOUD_PROJECT=${GCP_PROJECT}|FIRESTORE_DATABASE=family-tree|ENABLE_MAP=${ENABLE_MAP}|GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}|FRONTEND_URL=${FRONTEND_URL}|SMTP_HOST=${SMTP_HOST}|SMTP_PORT=${SMTP_PORT}|SMTP_USER=${SMTP_USER}|SMTP_PASSWORD=${SMTP_PASSWORD}|EMAIL_FROM=${EMAIL_FROM}|EMAIL_FROM_NAME=${EMAIL_FROM_NAME}|USE_EMAIL_IN_DEV=true"
 
-          # Deploy
+          # Deploy (explicit --project)
           gcloud run deploy "${SERVICE_NAME_CLEAN}" \
             --image "${IMAGE}" \
+            --project "${GCP_PROJECT}" \
             --region "${REGION}" \
             --platform managed \
             --allow-unauthenticated \
             --set-env-vars "${SET_ENV_VARS}"
 
-      - name: Print Cloud Run URL
+      - name: Print Cloud Run URL (robust)
         shell: bash
         env:
           SERVICE_NAME: ${{ secrets.CLOUD_RUN_SERVICE }}
           REGION: ${{ secrets.CLOUD_RUN_REGION }}
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         run: |
           set -euo pipefail
-          URL=$(gcloud run services describe "${SERVICE_NAME}" --region "${REGION}" --format='value(status.url)')
+
+          SERVICE_NAME="$(printf '%s' "${SERVICE_NAME:-}" | tr -d '\r\n' | xargs)"
+          REGION="$(printf '%s' "${REGION:-}" | tr -d '\r\n' | xargs)"
+          PROJECT_ID="$(printf '%s' "${PROJECT_ID:-}" | tr -d '\r\n' | xargs)"
+
+          echo "Project: [$PROJECT_ID]"
+          echo "Region : [$REGION]"
+          echo "Service: [$SERVICE_NAME]"
+
+          if ! gcloud run services describe "$SERVICE_NAME" \
+               --project "$PROJECT_ID" --region "$REGION" >/dev/null 2>&1; then
+            echo "Service not found in $PROJECT_ID/$REGION. Available services:"
+            gcloud run services list --platform=managed \
+              --project "$PROJECT_ID" \
+              --format='table(metadata.name,location,status.url)'
+            exit 1
+          fi
+
+          URL="$(gcloud run services describe "$SERVICE_NAME" \
+            --project "$PROJECT_ID" --region "$REGION" \
+            --format='value(status.url)')"
           echo "Service is live at: $URL"
 
   frontend-deploy:
@@ -247,15 +250,31 @@ jobs:
       - name: Docker auth for Artifact Registry
         run: gcloud auth configure-docker ${{ secrets.GAR_LOCATION }}-docker.pkg.dev
 
-      - name: Get backend URL
+      - name: Get backend URL (robust)
         shell: bash
         env:
           SERVICE_NAME: ${{ secrets.CLOUD_RUN_SERVICE }}
           REGION: ${{ secrets.CLOUD_RUN_REGION }}
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         run: |
           set -euo pipefail
-          BACKEND_URL=$(gcloud run services describe "${SERVICE_NAME}" --region "${REGION}" --format='value(status.url)')
-          echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+          SERVICE_NAME="$(printf '%s' "${SERVICE_NAME:-}" | tr -d '\r\n' | xargs)"
+          REGION="$(printf '%s' "${REGION:-}" | tr -d '\r\n' | xargs)"
+          PROJECT_ID="$(printf '%s' "${PROJECT_ID:-}" | tr -d '\r\n' | xargs)"
+
+          if ! gcloud run services describe "$SERVICE_NAME" \
+               --project "$PROJECT_ID" --region "$REGION" >/dev/null 2>&1; then
+            echo "Backend service not found in $PROJECT_ID/$REGION. Available services:"
+            gcloud run services list --platform=managed \
+              --project "$PROJECT_ID" \
+              --format='table(metadata.name,location,status.url)'
+            exit 1
+          fi
+          BACKEND_URL="$(gcloud run services describe "$SERVICE_NAME" \
+            --project "$PROJECT_ID" --region "$REGION" \
+            --format='value(status.url)')"
+          echo "Found backend at: $BACKEND_URL"
+          echo "BACKEND_URL=$BACKEND_URL" >> "$GITHUB_ENV"
 
       - name: Build & push frontend image
         run: |
@@ -275,14 +294,33 @@ jobs:
         run: |
           gcloud run deploy family-tree-web \
             --image "$FRONTEND_IMAGE" \
+            --project ${{ secrets.GCP_PROJECT_ID }} \
             --region ${{ secrets.CLOUD_RUN_REGION }} \
             --platform managed \
             --allow-unauthenticated \
             --port 3000
 
-      - name: Print Frontend Cloud Run URL
+      - name: Print Frontend Cloud Run URL (robust)
+        shell: bash
+        env:
+          REGION: ${{ secrets.CLOUD_RUN_REGION }}
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         run: |
-          FRONTEND_URL=$(gcloud run services describe family-tree-web \
-            --region ${{ secrets.CLOUD_RUN_REGION }} \
-            --format='value(status.url)')
+          set -euo pipefail
+          REGION="$(printf '%s' "${REGION:-}" | tr -d '\r\n' | xargs)"
+          PROJECT_ID="$(printf '%s' "${PROJECT_ID:-}" | tr -d '\r\n' | xargs)"
+          SERVICE_NAME="family-tree-web"
+
+          if ! gcloud run services describe "$SERVICE_NAME" \
+               --project "$PROJECT_ID" --region "$REGION" >/dev/null 2>&1; then
+            echo "Frontend service not found in $PROJECT_ID/$REGION. Available services:"
+            gcloud run services list --platform=managed \
+              --project "$PROJECT_ID" \
+              --format='table(metadata.name,location,status.url)'
+            exit 1
+          fi
+
+          FRONTEND_URL="$(gcloud run services describe "$SERVICE_NAME" \
+            --project "$PROJECT_ID" --region "$REGION" \
+            --format='value(status.url)')"
           echo "Frontend is live at: $FRONTEND_URL"
