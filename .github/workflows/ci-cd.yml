@@ -148,32 +148,43 @@ jobs:
           SERVICE_NAME: ${{ secrets.CLOUD_RUN_SERVICE }}
           REGION: ${{ secrets.CLOUD_RUN_REGION }}
           IMAGE: ${{ env.IMAGE }}
+          ENV_GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          ENV_ENABLE_MAP: ${{ secrets.ENABLE_MAP || 'false' }}
+          ENV_GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY || '' }}
+          ENV_FRONTEND_URL: ${{ secrets.FRONTEND_URL || 'http://localhost:3000' }}
+          ENV_SMTP_HOST: ${{ secrets.SMTP_HOST || '' }}
+          ENV_SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}
+          ENV_SMTP_USER: ${{ secrets.SMTP_USER || '' }}
+          ENV_SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
+          ENV_EMAIL_FROM: ${{ secrets.EMAIL_FROM || '' }}
+          ENV_EMAIL_FROM_NAME: ${{ secrets.EMAIL_FROM_NAME || '' }}
         run: |
           set -euo pipefail
 
-          # Create dotenv file with explicit echo to ensure string values
-          echo "GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }}" > env.vars
-          echo "FIRESTORE_DATABASE=family-tree" >> env.vars
-          echo "ENABLE_MAP=${{ secrets.ENABLE_MAP || 'false' }}" >> env.vars
-          echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY || '' }}" >> env.vars
-          echo "FRONTEND_URL=${{ secrets.FRONTEND_URL || 'http://localhost:3000' }}" >> env.vars
-          echo "SMTP_HOST=${{ secrets.SMTP_HOST || '' }}" >> env.vars
-          echo "SMTP_PORT=${{ secrets.SMTP_PORT || '587' }}" >> env.vars
-          echo "SMTP_USER=${{ secrets.SMTP_USER || '' }}" >> env.vars
-          echo "SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD || '' }}" >> env.vars
-          echo "EMAIL_FROM=${{ secrets.EMAIL_FROM || '' }}" >> env.vars
-          echo "EMAIL_FROM_NAME=${{ secrets.EMAIL_FROM_NAME || '' }}" >> env.vars
-          echo "USE_EMAIL_IN_DEV=true" >> env.vars
+          # Helper to trim leading/trailing whitespace
+          clean() { printf '%s' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
 
-          echo "Environment file contents:"
-          cat env.vars
+          GCP_PROJECT=$(clean "$ENV_GCP_PROJECT_ID")
+          ENABLE_MAP=$(clean "$ENV_ENABLE_MAP")
+          GOOGLE_MAPS_API_KEY=$(clean "$ENV_GOOGLE_MAPS_API_KEY")
+          FRONTEND_URL=$(clean "$ENV_FRONTEND_URL")
+          SMTP_HOST=$(clean "$ENV_SMTP_HOST")
+          SMTP_PORT=$(clean "$ENV_SMTP_PORT")
+          SMTP_USER=$(clean "$ENV_SMTP_USER")
+          SMTP_PASSWORD=$(clean "$ENV_SMTP_PASSWORD")
+          EMAIL_FROM=$(clean "$ENV_EMAIL_FROM")
+          EMAIL_FROM_NAME=$(clean "$ENV_EMAIL_FROM_NAME")
 
+          # Compose env vars with a custom delimiter (^|^) to avoid comma/space parsing issues
+          SET_ENV_VARS="^|^GOOGLE_CLOUD_PROJECT=${GCP_PROJECT}|FIRESTORE_DATABASE=family-tree|ENABLE_MAP=${ENABLE_MAP}|GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}|FRONTEND_URL=${FRONTEND_URL}|SMTP_HOST=${SMTP_HOST}|SMTP_PORT=${SMTP_PORT}|SMTP_USER=${SMTP_USER}|SMTP_PASSWORD=${SMTP_PASSWORD}|EMAIL_FROM=${EMAIL_FROM}|EMAIL_FROM_NAME=${EMAIL_FROM_NAME}|USE_EMAIL_IN_DEV=true"
+
+          # Deploy
           gcloud run deploy "${SERVICE_NAME}" \
             --image "${IMAGE}" \
             --region "${REGION}" \
             --platform managed \
             --allow-unauthenticated \
-            --env-vars-file=env.vars
+            --set-env-vars "${SET_ENV_VARS}"
 
       - name: Print Cloud Run URL
         run: |
