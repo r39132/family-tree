@@ -19,6 +19,7 @@ export default function Home(){
   const [recoverId, setRecoverId] = useState<string>('');
   const [showCacheStats, setShowCacheStats] = useState(false);
   const [config, setConfig] = useState<any>({ enable_map: false });
+  const [treeView, setTreeView] = useState<'standard' | 'minimal' | 'horizontal' | 'cards'>('standard');
 
   function fmtVersionLabel(iso?: string, _count?: number, version?: number){
     if(!iso) return '';
@@ -170,39 +171,102 @@ export default function Home(){
       const deceased = !!x?.is_deceased;
       const style = deceased ? {color:'crimson'} : {};
       const asterisk = deceased ? '*' : '';
-      return <b style={style}>{x?.first_name} {x?.last_name}{asterisk}</b>;
+      let nameText;
+      if (treeView === 'minimal') {
+        nameText = `${x?.first_name || ''} ${(x?.last_name || '').charAt(0) || ''}${x?.last_name ? '.' : ''}`;
+      } else if (treeView === 'horizontal') {
+        nameText = `${x?.first_name || ''} ${x?.last_name || ''}`;
+      } else {
+        nameText = `${x?.first_name} ${x?.last_name}`;
+      }
+
+      if (treeView === 'horizontal' || treeView === 'cards') {
+        return (
+          <b
+            style={{...style, cursor: 'pointer', textDecoration: 'underline'}}
+            onClick={()=>router.push(`/view/${x.id}`)}
+            title={`View ${x.first_name}`}
+          >
+            {nameText}{asterisk}
+          </b>
+        );
+      }
+
+      return <b style={style}>{nameText}{asterisk}</b>;
     };
-    const dobText = (x:any)=> x?.dob ? x.dob : '';
+    const dobText = (x:any)=> {
+      if (treeView === 'minimal' || treeView === 'horizontal') return '';
+      if (treeView === 'cards') return x?.dob ? x.dob : '';
+      return x?.dob ? `(${x.dob})` : '';
+    };
+
+        const nodeClass =
+      treeView === 'standard' ? 'node-compact' :
+      treeView === 'minimal' ? 'node-minimal' :
+      treeView === 'horizontal' ? 'node-horizontal' :
+      treeView === 'cards' ? 'node-card' : '';
+    const buttonClass =
+      treeView === 'minimal' ? 'btn-tiny' :
+      treeView === 'standard' ? 'btn-sm' :
+      treeView === 'horizontal' ? 'btn-sm' :
+      treeView === 'cards' ? 'btn-sm' : '';
+
     return (
-      <li className="node">
-        {nameEl(m)}{' '}<span className="small">({dobText(m)})</span>
-        {s && (
+      <li className={nodeClass}>
+        {treeView === 'cards' ? (
           <>
-            {' '}<span style={{opacity:0.6}}>&amp;</span>{' '}
-            {nameEl(s)}{' '}<span className="small">({dobText(s)})</span>
+            <div className="card-header">
+              <div style={{ marginBottom: '4px' }}>
+                <div>{nameEl(m)} <span className="small">{dobText(m)}</span></div>
+              </div>
+              {s && (
+                <div>
+                  <div>
+                    <span style={{opacity:0.6}}>&amp;</span> {nameEl(s)} <span className="small">{dobText(s)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            {nameEl(m)}{' '}<span className="small">{dobText(m)}</span>
+            {s && (
+              <>
+                {' '}<span style={{opacity:0.6}}>&amp;</span>{' '}
+                {nameEl(s)}{' '}<span className="small">{dobText(s)}</span>
+              </>
+            )}
+            {treeView !== 'horizontal' && (
+              <div className="nav" style={{gap: treeView === 'minimal' ? 4 : 8}}>
+                <button className={`btn secondary ${buttonClass}`} title={`View ${m.first_name}`} onClick={()=>router.push(`/view/${m.id}`)}><View /></button>
+                <button className={`btn secondary ${buttonClass}`} title={`Edit ${m.first_name}`} onClick={()=>router.push(`/edit/${m.id}`)}><Edit /></button>
+                {config.enable_map && m.residence_location && (
+                  <button className={`btn secondary ${buttonClass}`} title={`View ${m.first_name} on map`} onClick={()=>router.push(`/map?member=${m.id}`)}><Map /></button>
+                )}
+                <button className={`btn ${buttonClass}`} title={`Delete ${m.first_name}`} onClick={()=>remove(m.id)}><Delete /></button>
+                {s && (<span className="vsep" />)}
+                {s && (
+                  <>
+                    <button className={`btn secondary ${buttonClass}`} title={`View ${s.first_name}`} onClick={()=>router.push(`/view/${s.id}`)}><View /></button>
+                    <button className={`btn secondary ${buttonClass}`} title={`Edit ${s.first_name}`} onClick={()=>router.push(`/edit/${s.id}`)}><Edit /></button>
+                    {config.enable_map && s.residence_location && (
+                      <button className={`btn secondary ${buttonClass}`} title={`View ${s.first_name} on map`} onClick={()=>router.push(`/map?member=${s.id}`)}><Map /></button>
+                    )}
+                    <button className={`btn ${buttonClass}`} title={`Delete ${s.first_name}`} onClick={()=>remove(s.id)}><Delete /></button>
+                  </>
+                )}
+              </div>
+            )}
           </>
         )}
-        <div className="nav" style={{gap:8}}>
-          <button className="btn secondary" title={`View ${m.first_name}`} onClick={()=>router.push(`/view/${m.id}`)}><View /></button>
-          <button className="btn secondary" title={`Edit ${m.first_name}`} onClick={()=>router.push(`/edit/${m.id}`)}><Edit /></button>
-          {config.enable_map && m.residence_location && (
-            <button className="btn secondary" title={`View ${m.first_name} on map`} onClick={()=>router.push(`/map?member=${m.id}`)}><Map /></button>
-          )}
-          <button className="btn" title={`Delete ${m.first_name}`} onClick={()=>remove(m.id)}><Delete /></button>
-          {s && (<span className="vsep" />)}
-          {s && (
-            <>
-              <button className="btn secondary" title={`View ${s.first_name}`} onClick={()=>router.push(`/view/${s.id}`)}><View /></button>
-              <button className="btn secondary" title={`Edit ${s.first_name}`} onClick={()=>router.push(`/edit/${s.id}`)}><Edit /></button>
-              {config.enable_map && s.residence_location && (
-                <button className="btn secondary" title={`View ${s.first_name} on map`} onClick={()=>router.push(`/map?member=${s.id}`)}><Map /></button>
-              )}
-              <button className="btn" title={`Delete ${s.first_name}`} onClick={()=>remove(s.id)}><Delete /></button>
-            </>
-          )}
-        </div>
         {n.children?.length>0 && (
-          <ul className="tree">
+          <ul className={`tree ${
+            treeView === 'standard' ? 'tree-compact' :
+            treeView === 'minimal' ? 'tree-minimal' :
+            treeView === 'horizontal' ? 'tree-horizontal' :
+            treeView === 'cards' ? 'tree-cards' : ''
+          }`}>
             {n.children
               .slice()
               .sort((a:any,b:any)=>{
@@ -231,14 +295,29 @@ export default function Home(){
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <h2 style={{ margin: 0 }}>Tree ({tree.members?.length ?? 0})</h2>
-        <button
-          className="btn secondary"
-          onClick={() => setShowCacheStats(true)}
-          style={{ fontSize: '12px', padding: '4px 8px' }}
-          title="View cache settings and statistics"
-        >
-          📊 Cache
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+            View:
+            <select
+              value={treeView}
+              onChange={e => setTreeView(e.target.value as 'standard' | 'minimal' | 'horizontal' | 'cards')}
+              style={{ fontSize: '14px', padding: '6px 8px' }}
+            >
+              <option value="standard">Standard</option>
+              <option value="minimal">Minimal</option>
+              <option value="horizontal">Horizontal</option>
+              <option value="cards">Cards</option>
+            </select>
+          </label>
+          <button
+            className="btn secondary"
+            onClick={() => setShowCacheStats(true)}
+            style={{ fontSize: '12px', padding: '4px 8px' }}
+            title="View cache settings and statistics"
+          >
+            📊 Cache
+          </button>
+        </div>
       </div>
         {unsaved && (
           <p style={{color:'crimson', marginTop:0}}>You have unsaved changes. Please click Save to create a new version.</p>
@@ -256,10 +335,17 @@ export default function Home(){
           </div>
         </div>
         {tree.roots?.length ? (
-          <ul className="tree">
-            {tree.roots.map((r:any)=>(<Node key={r.member.id} n={r}/>))}
-          </ul>
-  ) : <p>No members yet. Click "Add member" to add the first member.</p>}
+          <div className={`tree-container ${treeView === 'horizontal' ? 'tree-container-horizontal' : ''}`}>
+            <ul className={`tree ${
+              treeView === 'standard' ? 'tree-compact' :
+              treeView === 'minimal' ? 'tree-minimal' :
+              treeView === 'horizontal' ? 'tree-horizontal' :
+              treeView === 'cards' ? 'tree-cards' : ''
+            }`}>
+              {tree.roots.map((r:any)=>(<Node key={r.member.id} n={r}/>))}
+            </ul>
+          </div>
+        ) : <p>No members yet. Click "Add member" to add the first member.</p>}
       </div>
 
   {/* Add member moved to /add */}

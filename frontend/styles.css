@@ -29,7 +29,42 @@ hr{border:none;border-top:1px solid #eaeaea;margin:16px 0}
 select{padding:10px;border-radius:8px;border:1px solid #ddd}
 ul.tree{list-style:none;padding-left:24px}
 li.node{margin:6px 0;padding:6px 8px;border-left:3px solid var(--accent)}
+
+/* Tree container for scrolling and layout */
+.tree-container{max-height:80vh;overflow:auto}
+.tree-container-horizontal{overflow-x:auto;overflow-y:visible;max-height:none}
+
+/* Tree view variations */
+ul.tree-compact{padding-left:16px}
+li.node-compact{margin:3px 0;padding:4px 6px;border-left:2px solid var(--accent);font-size:14px}
+ul.tree-minimal{padding-left:12px}
+li.node-minimal{margin:2px 0;padding:2px 4px;border-left:1px solid var(--accent);font-size:12px}
+ul.tree-horizontal{padding-left:0;display:flex;flex-wrap:wrap;gap:8px}
+li.node-horizontal{margin:2px 4px;padding:4px 8px;border:1px solid var(--accent);border-radius:8px;background:#f9f9f9;font-size:13px;flex:0 0 auto}
+li.node-horizontal ul.tree-horizontal{margin-top:8px;padding-left:16px;width:100%}
+ul.tree-cards{padding-left:0;display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:16px}
+li.node-card{margin:0;padding:12px;border:1px solid var(--accent);border-radius:12px;background:var(--card);box-shadow:0 2px 8px rgba(0,0,0,0.1);font-size:14px;display:flex;flex-direction:column;gap:8px}
+li.node-card .card-header{display:flex;flex-direction:column;gap:4px}
+li.node-card ul.tree-cards{margin-top:12px;padding-left:0;grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));gap:12px}
+
+/* Button size variations */
+.btn-sm{padding:4px 8px;font-size:12px;border-radius:6px}
+.btn-tiny{padding:2px 4px;font-size:10px;border-radius:4px}
+
 .small{font-size:12px;opacity:.8}
+.node-compact .small{font-size:10px}
+.node-minimal .small{font-size:9px}
+.node-horizontal .small{font-size:10px}
+.node-card .small{font-size:11px;display:block;margin-top:4px}
+
+/* Responsive design for mobile */
+@media (max-width: 768px) {
+  ul.tree-cards{grid-template-columns:1fr}
+  li.node-card ul.tree-cards{grid-template-columns:1fr}
+  ul.tree-horizontal{flex-direction:column}
+  li.node-horizontal{width:100%;margin:2px 0}
+  .tree-container{max-height:60vh}
+}
 .checkbox{margin-right:8px}
 
 /* input with trailing action (e.g., password eye) */
