@@ -7,11 +7,11 @@ from fastapi.testclient import TestClient
 
 
 def test_health_endpoint_returns_timezone_aware_timestamp():
-    """Test that /healthz endpoint returns basic status."""
+    """Test that /status endpoint returns basic status."""
     from app.main import app
 
     client = TestClient(app)
-    response = client.get("/healthz")
+    response = client.get("/status")
 
     assert response.status_code == 200
     data = response.json()

@@ -55,15 +55,9 @@ except Exception as e:
     # Continue startup even if database initialization fails
 
 
-@app.get("/healthz")
-def health():
-    """Health check endpoint"""
-    return {"status": "ok"}
-
-
 @app.get("/status")
 def status():
-    """Alternative status endpoint"""
+    """Health check endpoint - Google Cloud Run intercepts /healthz so we use /status"""
     return {"status": "ok"}
 
 

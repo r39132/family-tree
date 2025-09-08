@@ -31,12 +31,12 @@ jobs:
           echo "Dry run: ${{ github.event.inputs.dry_run || 'false' }}"
 
           # Check if API is reachable
-          if ! curl -s -f --max-time 10 "$API_BASE_URL/healthz" >/dev/null 2>&1; then
+          if ! curl -s -f --max-time 10 "$API_BASE_URL/status" >/dev/null 2>&1; then
             echo "❌ ERROR: API not reachable at $API_BASE_URL"
             echo "Please check:"
             echo "  1. API_BASE_URL secret is correctly set"
             echo "  2. Your Family Tree API is running and accessible"
-            echo "  3. The /healthz endpoint is available"
+            echo "  3. The /status endpoint is available"
             exit 1
           fi
 

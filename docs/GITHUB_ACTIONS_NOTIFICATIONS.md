@@ -163,7 +163,7 @@ Troubleshooting:
 **2. API Not Reachable**
 - Verify `API_BASE_URL` is correct and accessible
 - Check if your API is running and deployed
-- Ensure the `/healthz` endpoint exists
+- Ensure the `/status` endpoint exists
 
 **3. No Emails Sent**
 - Check that users have enabled notifications in their settings
@@ -181,7 +181,7 @@ Test your API endpoint directly:
 
 ```bash
 # Test API health
-curl https://your-api.com/healthz
+curl https://your-api.com/status
 
 # Test authentication
 curl -H "Authorization: Bearer YOUR_TOKEN" \
