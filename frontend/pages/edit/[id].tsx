@@ -172,7 +172,7 @@ export default function EditMemberPage(){
                     return allMembers.filter(m=>
                       m.id !== member.id && // Not themselves
                       (!m.spouse_id || m.spouse_id === member.id) && // Not married to someone else
-                      !membersInTree.has(m.id) // Not part of the family tree structure
+                      (!membersInTree.has(m.id) || m.id === member.spouse_id) // Not part of the family tree structure, unless they're the current spouse
                     ).map((m:any)=>(
                       <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
                     ));
