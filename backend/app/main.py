@@ -9,7 +9,6 @@ from .routes_spaces import ensure_default_spaces
 from .routes_spaces import router as spaces_router
 from .routes_tree import router as tree_router
 from .routes_user import router as user_router
-from .utils.time import to_iso_string, utc_now
 
 app = FastAPI(
     title=settings.app_name,
@@ -58,23 +57,14 @@ except Exception as e:
 
 @app.get("/healthz")
 def health():
-    """Health check endpoint with build and git information"""
-    return {
-        "status": "ok",
-        "version": settings.app_version,
-        "message": "Health endpoint is working!",
-        "timestamp": to_iso_string(utc_now()),
-    }
+    """Health check endpoint"""
+    return {"status": "ok"}
 
 
-@app.get("/health")
-def health_alias():
-    """Alternative health check endpoint"""
-    return {
-        "status": "ok",
-        "message": "Health alias working!",
-        "timestamp": to_iso_string(utc_now()),
-    }
+@app.get("/status")
+def status():
+    """Alternative status endpoint"""
+    return {"status": "ok"}
 
 
 @app.get("/config")
