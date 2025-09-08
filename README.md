@@ -136,6 +136,8 @@ The project includes GitHub Actions workflow for automatic deployment to Google 
 - **[Architecture Overview](docs/ARCHITECTURE.md)** - Technical architecture, data flow, and sequence diagrams
 - **[Screenshots](docs/SCREENSHOTS.md)** - Application screenshots and UI examples
 - **[Deployment Guide](docs/DEPLOYMENT.md)** - CI/CD setup, Docker configuration, and cloud deployment
+- **[Event Notifications](docs/EVENT_NOTIFICATIONS.md)** - Automated email notifications setup and configuration
+- **[GitHub Actions Notifications](docs/GITHUB_ACTIONS_NOTIFICATIONS.md)** - Cloud-based automated notifications setup
 
 ## Contributing
 

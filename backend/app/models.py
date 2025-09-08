@@ -205,6 +205,19 @@ class EventsResponse(BaseModel):
     notification_enabled: bool
 
 
+class EventNotificationLog(BaseModel):
+    """Track individual event notifications to prevent duplicates."""
+
+    id: str  # Unique ID for this notification log entry
+    user_id: str
+    space_id: str
+    member_id: str
+    event_type: str  # "birthday" or "death_anniversary"
+    event_date: str  # YYYY-MM-DD format for this year's occurrence
+    notification_sent_at: str  # ISO timestamp when notification was sent
+    created_at: Optional[str] = None  # When this log entry was created
+
+
 class FamilySpace(BaseModel):
     id: str
     name: str

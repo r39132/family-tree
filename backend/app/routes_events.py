@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends
@@ -97,23 +97,28 @@ def get_all_year_events(
             )
 
             # Death anniversary if deceased
-            if member.get("is_deceased"):
-                # For death anniversary, we need a death date - for now use dob as placeholder
-                # In a real app, you'd have a separate death_date field
-                death_anniversary_date = this_year_date  # Simplified for demo
-                years_since_death = year - original_date.year
+            if member.get("is_deceased") and member.get("date_of_death"):
+                try:
+                    # Parse the actual death date
+                    death_date = parse_date(member["date_of_death"])
+                    # Calculate this year's death anniversary
+                    death_anniversary_date = death_date.replace(year=year)
+                    years_since_death = year - death_date.year
 
-                events.append(
-                    FamilyEvent(
-                        id=f"death_anniversary_{member['id']}_{year}",
-                        member_id=member["id"],
-                        member_name=f"{member.get('first_name', '')} {member.get('last_name', '')}".strip(),
-                        event_type="death_anniversary",
-                        event_date=death_anniversary_date.strftime("%Y-%m-%d"),
-                        age_on_date=years_since_death,
-                        original_date=member["dob"],
+                    events.append(
+                        FamilyEvent(
+                            id=f"death_anniversary_{member['id']}_{year}",
+                            member_id=member["id"],
+                            member_name=f"{member.get('first_name', '')} {member.get('last_name', '')}".strip(),
+                            event_type="death_anniversary",
+                            event_date=death_anniversary_date.strftime("%Y-%m-%d"),
+                            age_on_date=years_since_death,
+                            original_date=member["date_of_death"],
+                        )
                     )
-                )
+                except ValueError:
+                    # Skip if death date is invalid
+                    continue
 
         except ValueError:
             # Skip members with invalid date formats
@@ -186,7 +191,7 @@ def update_notification_settings(
 
 @router.post("/notifications/send-reminders")
 def send_event_reminders():
-    """Send email reminders for events happening within 48 hours (typically called by a cron job)."""
+    """Send individual email reminders for events happening within 48 hours (typically called by a cron job)."""
     db = get_db()
 
     # Get all users with notifications enabled (grouped by space)
@@ -197,6 +202,7 @@ def send_event_reminders():
         return {"ok": True, "sent": 0, "message": "No users have notifications enabled"}
 
     sent_count = 0
+    total_events_processed = 0
 
     # Group users by space for efficient processing
     users_by_space = {}
@@ -222,16 +228,18 @@ def send_event_reminders():
         today = utc_now().date()  # Use date for comparison
         near_future = today + timedelta(days=2)
 
-        # Filter to events within 48 hours
+        # Filter to events within 48 hours (including events happening today)
         imminent_events = [
             event
             for event in upcoming_events
             if today <= datetime.strptime(event.event_date, "%Y-%m-%d").date() <= near_future
         ]
 
-        # Send notifications to users in this space
+        total_events_processed += len(imminent_events)
+
+        # Send individual notifications to users in this space
         for user_id, notification_id in users_in_space:
-            # Get user email
+            # Get user email and notification settings
             user_ref = db.collection("users").document(user_id)
             user_doc = user_ref.get()
             if not user_doc.exists:
@@ -242,31 +250,141 @@ def send_event_reminders():
             if not user_email:
                 continue
 
-            if imminent_events:
-                # Compose email
-                subject = f"Family Events Reminder - {len(imminent_events)} upcoming"
+            # Get when the user enabled notifications to handle late enablers
+            notification_settings_ref = db.collection("event_notifications").document(
+                notification_id
+            )
+            notification_settings_doc = notification_settings_ref.get()
+            notification_settings = (
+                notification_settings_doc.to_dict() if notification_settings_doc.exists else {}
+            )
 
-                body_lines = ["Hello! Here are the upcoming family events:\n"]
-                for event in imminent_events:
-                    event_date = datetime.strptime(event.event_date, "%Y-%m-%d")
-                    formatted_date = event_date.strftime("%B %d, %Y")
+            # Check when notifications were last updated/enabled
+            notification_updated_at = notification_settings.get("updated_at")
+            recent_enabler = False
 
-                    if event.event_type == "birthday":
-                        body_lines.append(
-                            f"🎂 {event.member_name}'s birthday - {formatted_date} (turning {event.age_on_date})"
-                        )
-                    else:
-                        body_lines.append(
-                            f"🕊️ {event.member_name}'s remembrance - {formatted_date} ({event.age_on_date} years)"
-                        )
+            if notification_updated_at:
+                # Convert Firestore timestamp to datetime if needed
+                if hasattr(notification_updated_at, "seconds"):
+                    updated_datetime = datetime.fromtimestamp(
+                        notification_updated_at.seconds, tz=timezone.utc
+                    )
+                else:
+                    updated_datetime = notification_updated_at
 
-                body_lines.append("\nBest regards,\nFamily Tree")
-                body = "\n".join(body_lines)
+                # Check if notifications were enabled within the last 6 hours
+                # Ensure both datetimes are timezone-aware for comparison
+                if updated_datetime.tzinfo is None:
+                    updated_datetime = updated_datetime.replace(tzinfo=timezone.utc)
+
+                time_since_enabled = utc_now() - updated_datetime
+                recent_enabler = time_since_enabled <= timedelta(hours=6)
+
+            # Send individual emails for each imminent event
+            for event in imminent_events:
+                # Check if we've already sent a notification for this event to this user
+                notification_log_id = (
+                    f"{user_id}_{space_id}_{event.member_id}_{event.event_type}_{event.event_date}"
+                )
+                log_ref = db.collection("event_notification_logs").document(notification_log_id)
+                existing_log = log_ref.get()
+
+                if existing_log.exists and not recent_enabler:
+                    # Already sent notification for this event, unless user recently enabled notifications
+                    continue
+
+                # For recent enablers, check if the event is within 6 hours
+                if recent_enabler:
+                    event_datetime = datetime.strptime(event.event_date, "%Y-%m-%d")
+                    time_until_event = event_datetime.date() - utc_now().date()
+
+                    # Only send to recent enablers if event is within next 6 hours to 48 hours window
+                    if time_until_event.days > 2 or (
+                        time_until_event.days == 0 and utc_now().hour > 18
+                    ):
+                        # Skip events that are too far away or events today that have likely passed
+                        continue
+
+                # Compose individual email for this event
+                event_date = datetime.strptime(event.event_date, "%Y-%m-%d")
+                formatted_date = event_date.strftime("%B %d, %Y")
+
+                if event.event_type == "birthday":
+                    subject = f"🎂 Upcoming Birthday: {event.member_name}"
+                    body = f"""Hello!
+
+This is a reminder that {event.member_name}'s birthday is coming up:
+
+🎂 {event.member_name}'s Birthday
+📅 {formatted_date}
+🎈 Turning {event.age_on_date} years old
+
+Don't forget to wish them a happy birthday!
+
+Best regards,
+Family Tree"""
+                else:
+                    subject = f"🕊️ Remembrance Day: {event.member_name}"
+                    body = f"""Hello!
+
+This is a reminder of an upcoming remembrance day:
+
+🕊️ {event.member_name}'s Remembrance
+📅 {formatted_date}
+💝 {event.age_on_date} years since they passed
+
+Take a moment to remember and honor their memory.
+
+Best regards,
+Family Tree"""
 
                 try:
+                    # Send the email
                     send_mail(user_email, subject, body)
-                    sent_count += 1
-                except Exception as e:
-                    print(f"Failed to send email to {user_email}: {e}")
 
-    return {"ok": True, "sent": sent_count, "events": len(imminent_events)}
+                    # Log that we sent this notification (or update existing log for recent enablers)
+                    log_ref.set(
+                        {
+                            "user_id": user_id,
+                            "space_id": space_id,
+                            "member_id": event.member_id,
+                            "event_type": event.event_type,
+                            "event_date": event.event_date,
+                            "notification_sent_at": utc_now().isoformat(),
+                            "created_at": firestore.SERVER_TIMESTAMP,
+                            "recent_enabler": recent_enabler,  # Track if this was sent due to recent enabling
+                        }
+                    )
+
+                    sent_count += 1
+                    enabler_msg = " (recent enabler)" if recent_enabler else ""
+                    print(
+                        f"✅ Sent {event.event_type} notification for {event.member_name} to {user_email}{enabler_msg}"
+                    )
+
+                except Exception as e:
+                    print(
+                        f"❌ Failed to send {event.event_type} notification for {event.member_name} to {user_email}: {e}"
+                    )
+
+    return {"ok": True, "sent": sent_count, "events_processed": total_events_processed}
+
+
+@router.get("/notifications/logs")
+def get_notification_logs(current_user: str = Depends(get_current_username), limit: int = 50):
+    """Get recent notification logs for the current user's space (for debugging/admin)."""
+    db = get_db()
+    space_id = _get_user_space(current_user)
+
+    # Get notification logs for this space
+    logs_ref = (
+        db.collection("event_notification_logs").where("space_id", "==", space_id).limit(limit)
+    )
+
+    logs = []
+    for doc in logs_ref.stream():
+        log_data = doc.to_dict()
+        log_data["id"] = doc.id
+        logs.append(log_data)
+
+    return {"logs": logs, "space_id": space_id}

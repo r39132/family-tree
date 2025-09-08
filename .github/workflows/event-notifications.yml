@@ -1,0 +1,155 @@
+name: Send Event Notifications
+
+on:
+  schedule:
+    # Run every 3 hours (0, 3, 6, 9, 12, 15, 18, 21 UTC)
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+    # Allow manual triggering for testing
+    inputs:
+      dry_run:
+        description: 'Dry run mode (log only, do not send emails)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  send-notifications:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Send event notifications
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+        run: |
+          echo "🔔 Starting Family Tree event notifications..."
+          echo "API URL: $API_BASE_URL"
+          echo "Dry run: ${{ github.event.inputs.dry_run || 'false' }}"
+
+          # Check if API is reachable
+          if ! curl -s -f --max-time 10 "$API_BASE_URL/health" >/dev/null 2>&1; then
+            echo "❌ ERROR: API not reachable at $API_BASE_URL"
+            echo "Please check:"
+            echo "  1. API_BASE_URL secret is correctly set"
+            echo "  2. Your Family Tree API is running and accessible"
+            echo "  3. The /health endpoint is available"
+            exit 1
+          fi
+
+          echo "✅ API health check passed"
+
+          # Prepare the request
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "🧪 DRY RUN MODE - No actual emails will be sent"
+            # In a real implementation, you might have a dry_run parameter
+            # For now, we'll just log what would happen
+            echo "Would call: POST $API_BASE_URL/events/notifications/send-reminders"
+            exit 0
+          fi
+
+          # Send notifications
+          echo "📧 Sending event notifications..."
+
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Authorization: Bearer $ADMIN_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "User-Agent: GitHub-Actions-Event-Notifications/1.0" \
+            --max-time 30 \
+            "$API_BASE_URL/events/notifications/send-reminders")
+
+          # Parse response
+          http_code=$(echo "$response" | tail -n1)
+          response_body=$(echo "$response" | head -n -1)
+
+          echo "HTTP Status: $http_code"
+          echo "Response: $response_body"
+
+          if [ "$http_code" = "200" ]; then
+            # Try to parse JSON response
+            sent_count=$(echo "$response_body" | python3 -c "
+            import sys, json
+            try:
+                data = json.load(sys.stdin)
+                print(data.get('sent', 0))
+            except:
+                print('0')
+            " 2>/dev/null || echo "0")
+
+            events_count=$(echo "$response_body" | python3 -c "
+            import sys, json
+            try:
+                data = json.load(sys.stdin)
+                print(data.get('events_processed', 0))
+            except:
+                print('0')
+            " 2>/dev/null || echo "0")
+
+            echo "✅ SUCCESS: Sent $sent_count notifications for $events_count events"
+
+            # Create job summary
+            cat >> $GITHUB_STEP_SUMMARY << EOF
+          # 🎉 Event Notifications Sent Successfully
+
+          **Summary:**
+          - 📧 **Emails sent:** $sent_count
+          - 📅 **Events processed:** $events_count
+          - ⏰ **Time:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          - 🔗 **API:** \`$API_BASE_URL\`
+
+          **Details:**
+          \`\`\`json
+          $response_body
+          \`\`\`
+          EOF
+
+          elif [ "$http_code" = "401" ]; then
+            echo "❌ ERROR: Authentication failed (HTTP 401)"
+            echo "Please check that the ADMIN_TOKEN secret is correctly set and valid"
+            exit 1
+
+          elif [ "$http_code" = "403" ]; then
+            echo "❌ ERROR: Authorization failed (HTTP 403)"
+            echo "The provided token doesn't have sufficient permissions"
+            exit 1
+
+          elif [ "$http_code" = "404" ]; then
+            echo "❌ ERROR: Endpoint not found (HTTP 404)"
+            echo "Please verify the API endpoint exists: $API_BASE_URL/events/notifications/send-reminders"
+            exit 1
+
+          else
+            echo "❌ ERROR: HTTP $http_code"
+            echo "Response: $response_body"
+
+            # Create failure summary
+            cat >> $GITHUB_STEP_SUMMARY << EOF
+          # ❌ Event Notifications Failed
+
+          **Error Details:**
+          - 🚨 **HTTP Status:** $http_code
+          - ⏰ **Time:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          - 🔗 **API:** \`$API_BASE_URL\`
+
+          **Response:**
+          \`\`\`
+          $response_body
+          \`\`\`
+
+          **Troubleshooting:**
+          - Check API_BASE_URL and ADMIN_TOKEN secrets
+          - Verify the API is running and accessible
+          - Check the API logs for more details
+          EOF
+
+            exit 1
+          fi
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "🚨 Event notification job failed!"
+          echo "Check the logs above for details and verify your secrets configuration."
