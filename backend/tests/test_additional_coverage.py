@@ -48,7 +48,7 @@ def setup_function(function):
 def test_health_endpoint():
     """Test the health check endpoint"""
     client = TestClient(app)
-    r = client.get("/healthz")
+    r = client.get("/status")
     assert r.status_code == 200
     assert r.json()["status"] == "ok"
 
