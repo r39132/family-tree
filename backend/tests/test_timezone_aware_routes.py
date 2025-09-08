@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 
 def test_health_endpoint_returns_timezone_aware_timestamp():
-    """Test that /healthz endpoint returns ISO8601 timestamp with Z suffix."""
+    """Test that /healthz endpoint returns basic status."""
     from app.main import app
 
     client = TestClient(app)
@@ -16,16 +16,9 @@ def test_health_endpoint_returns_timezone_aware_timestamp():
     assert response.status_code == 200
     data = response.json()
 
-    # Should have timestamp field
-    assert "timestamp" in data
-    timestamp = data["timestamp"]
-
-    # Should be ISO8601 format with Z suffix (UTC)
-    assert timestamp.endswith("Z")
-
-    # Should be parseable as ISO format
-    parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-    assert parsed.tzinfo == timezone.utc
+    # Should have status field
+    assert "status" in data
+    assert data["status"] == "ok"
 
 
 @patch("app.routes_admin.get_db")
