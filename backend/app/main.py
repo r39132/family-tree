@@ -49,7 +49,11 @@ app.include_router(user_router)
 app.include_router(spaces_router)
 
 # Initialize default family spaces on startup
-ensure_default_spaces()
+try:
+    ensure_default_spaces()
+except Exception as e:
+    print(f"Warning: Failed to initialize default spaces: {e}")
+    # Continue startup even if database initialization fails
 
 
 @app.get("/healthz")
@@ -59,6 +63,16 @@ def health():
         "status": "ok",
         "version": settings.app_version,
         "message": "Health endpoint is working!",
+        "timestamp": to_iso_string(utc_now()),
+    }
+
+
+@app.get("/health")
+def health_alias():
+    """Alternative health check endpoint"""
+    return {
+        "status": "ok",
+        "message": "Health alias working!",
         "timestamp": to_iso_string(utc_now()),
     }
 
