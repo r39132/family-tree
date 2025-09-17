@@ -457,13 +457,7 @@ def create_member(
 
     # derive timestamp field from MM/DD/YYYY and disallow future dates
     try:
-        dob_dt = datetime.strptime(member.dob, "%m/%d/%Y").replace(tzinfo=timezone.utc)
-        # Validate not in the future
-        if dob_dt > utc_now():
-            raise HTTPException(status_code=400, detail="Date of Birth cannot be in the future")
-        data["dob_ts"] = dob_dt
-    except HTTPException:
-        raise
+        data["dob_ts"] = datetime.strptime(member.dob, "%m/%d/%Y").replace(tzinfo=timezone.utc)
     except Exception:
         # leave unparsed; tolerated by model, but dob_ts will be absent
         pass

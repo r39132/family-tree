@@ -1,7 +1,10 @@
 import re
+from datetime import datetime, timezone
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, ValidationInfo, field_validator
+
+from .utils.time import utc_now
 
 
 class RegisterRequest(BaseModel):
@@ -100,6 +103,7 @@ class CreateMember(BaseModel):
     is_deceased: Optional[bool] = False
     middle_name: Optional[str] = None
     birth_location: Optional[str] = None
+    date_of_death: Optional[str] = None
     residence_location: Optional[str] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
@@ -129,6 +133,35 @@ class CreateMember(BaseModel):
         if not v:
             raise ValueError("dob is required")
         # Accept any non-empty string; route will attempt to parse
+        return v
+
+    @field_validator("dob", "date_of_death")
+    @classmethod
+    def _validate_past_date(cls, v: str):
+        try:
+            date = datetime.strptime(v, "%m/%d/%Y").replace(tzinfo=timezone.utc)
+        except Exception:
+            return v
+
+        if date > utc_now():
+            raise ValueError("This date cannot be in the future")
+
+        return v
+
+    @field_validator("date_of_death")
+    @classmethod
+    def _validate_date_of_death_future_to_dob(cls, v: str, info: ValidationInfo):
+        try:
+            dates = [
+                datetime.strptime(x, "%m/%d/%Y").replace(tzinfo=timezone.utc)
+                for x in [v, info.data["dob"]]
+            ]
+        except Exception:
+            return v
+
+        if dates[0] <= dates[1]:
+            raise ValueError("Date of Death must be later than Date of Birth.")
+
         return v
 
     @field_validator(
