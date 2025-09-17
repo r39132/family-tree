@@ -123,8 +123,66 @@ def test_create_member_rejects_future_dob():
             json={"first_name": "Fut", "last_name": "Ure", "dob": "12/31/2999"},
             headers={"Authorization": "Bearer x"},
         )
-        assert r.status_code == 400
-        assert "future" in (r.json().get("detail") or "").lower()
+        assert r.status_code == 422
+        assert "future" in (r.json().get("detail")[0]["msg"] or "").lower()
+    finally:
+        routes_tree.get_db = orig_get_db
+        app.dependency_overrides.clear()
+
+
+def test_create_member_rejects_future_date_of_death():
+    from app import routes_tree
+    from app.deps import get_current_username
+
+    fake_db = FakeDB()
+
+    app.dependency_overrides[get_current_username] = lambda: "tester"
+    orig_get_db = routes_tree.get_db
+    routes_tree.get_db = lambda: fake_db
+
+    client = TestClient(app)
+    try:
+        r = client.post(
+            "/tree/members",
+            json={
+                "first_name": "Fut",
+                "last_name": "Ure",
+                "dob": "12/31/1999",
+                "date_of_death": "12/31/2999",
+            },
+            headers={"Authorization": "Bearer x"},
+        )
+        assert r.status_code == 422
+        assert "future" in (r.json().get("detail")[0]["msg"] or "").lower()
+    finally:
+        routes_tree.get_db = orig_get_db
+        app.dependency_overrides.clear()
+
+
+def test_create_member_rejects_dob_latter_than_date_of_death():
+    from app import routes_tree
+    from app.deps import get_current_username
+
+    fake_db = FakeDB()
+
+    app.dependency_overrides[get_current_username] = lambda: "tester"
+    orig_get_db = routes_tree.get_db
+    routes_tree.get_db = lambda: fake_db
+
+    client = TestClient(app)
+    try:
+        r = client.post(
+            "/tree/members",
+            json={
+                "first_name": "Fut",
+                "last_name": "Ure",
+                "dob": "12/31/1999",
+                "date_of_death": "12/31/1998",
+            },
+            headers={"Authorization": "Bearer x"},
+        )
+        assert r.status_code == 422
+        assert "later" in (r.json().get("detail")[0]["msg"] or "").lower()
     finally:
         routes_tree.get_db = orig_get_db
         app.dependency_overrides.clear()
