@@ -4,7 +4,7 @@ import TopNav from '../../components/TopNav';
 import MemberEditor from '../../components/MemberEditor';
 import { api } from '../../lib/api';
 import Modal from '../../components/Modal';
-import TreeCacheManager from '../../lib/treeCache';
+import LoadingOverlay from '../../components/LoadingOverlay';
 
 export default function EditMemberPage(){
   const router = useRouter();
@@ -20,6 +20,8 @@ export default function EditMemberPage(){
   const [hasFormChanges, setHasFormChanges] = useState(false);
   const [hasSpouseChange, setHasSpouseChange] = useState(false);
   const [originalSpouseId, setOriginalSpouseId] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   // Helper function to get all member IDs that are part of the tree structure
   function getMembersInTree(roots: any[]): Set<string> {
@@ -44,6 +46,7 @@ export default function EditMemberPage(){
   useEffect(()=>{
     if(!id) return;
     (async()=>{
+      setLoading(true);
       try{
         const configData = await api('/config');
         setConfig(configData);
@@ -56,7 +59,11 @@ export default function EditMemberPage(){
         if(!m) throw new Error('Member not found');
         setMember(m);
         setOriginalSpouseId(m.spouse_id || '');
-      }catch(e:any){ setError(e?.message || 'Failed to load member'); }
+      }catch(e:any){
+        setError(e?.message || 'Failed to load member');
+      } finally {
+        setLoading(false);
+      }
     })();
   },[id]);
 
@@ -70,21 +77,16 @@ export default function EditMemberPage(){
   // Check if there are any changes overall
   const hasChanges = hasFormChanges || hasSpouseChange;
 
-  async function onSave(m:any){
+    async function onSave(m:any){
     const errs: string[] = [];
     if(!m.first_name?.trim()) errs.push('First name is required.');
     if(!m.last_name?.trim()) errs.push('Last name is required.');
     if(!m.dob?.trim()) errs.push('Date of Birth is required.');
     if(errs.length){ setInvalidMsgs(errs); setShowInvalid(true); return; }
+
+    setSaving(true);
     try{
       const body = normalizePayload(titleCaseAll(m));
-
-      const cacheManager = TreeCacheManager.getInstance();
-
-      // Check if this update affects tree display before making the API call
-      if (cacheManager.shouldInvalidateForMemberUpdate(body)) {
-        cacheManager.invalidateCache('data_changed');
-      }
 
       await api(`/tree/members/${m.id}`, { method:'PATCH', body: JSON.stringify(body) });
       router.push('/');
@@ -105,6 +107,8 @@ export default function EditMemberPage(){
         }
       }catch{}
       throw e;
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -203,6 +207,17 @@ export default function EditMemberPage(){
           {invalidMsgs.map((m,i)=>(<li key={i}>{m}</li>))}
         </ul>
       </Modal>
+
+      {/* Loading Overlays */}
+      <LoadingOverlay
+        isLoading={loading}
+        message="Loading member data..."
+      />
+      <LoadingOverlay
+        isLoading={saving}
+        message="Saving changes..."
+        transparent={true}
+      />
     </div>
   );
 }

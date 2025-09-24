@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import TopNav from '../components/TopNav';
 import { api } from '../lib/api';
+import LoadingOverlay from '../components/LoadingOverlay';
 
 type FamilyEvent = {
   id: string;
@@ -316,6 +317,17 @@ export default function EventsPage() {
       </div>
 
       {view === 'list' ? renderListView() : renderCalendarView()}
+
+      {/* Loading Overlays */}
+      <LoadingOverlay
+        isLoading={loading}
+        message="Loading family events..."
+      />
+      <LoadingOverlay
+        isLoading={updatingNotifications}
+        message="Updating notification settings..."
+        transparent={true}
+      />
     </div>
   );
 }

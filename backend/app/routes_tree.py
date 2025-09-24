@@ -189,10 +189,10 @@ def search_members(
     return members_data
 
 
-def _snapshot_relations(db):
-    # Return deterministic snapshot of relations for change detection
+def _snapshot_relations(db, space_id: str):
+    # Return deterministic snapshot of relations for change detection - SPACE-AWARE
     rels = []
-    for d in db.collection("relations").stream():
+    for d in db.collection("relations").where("space_id", "==", space_id).stream():
         data = d.to_dict() or {}
         # Store as objects to avoid nested arrays (Firestore forbids arrays of arrays)
         rels.append({"parent_id": data.get("parent_id"), "child_id": data.get("child_id")})
@@ -201,22 +201,21 @@ def _snapshot_relations(db):
     return rels
 
 
-def _get_latest_version(db):
-    qs = (
-        db.collection("tree_versions")
-        .order_by("created_at", direction="DESCENDING")
-        .limit(1)
-        .stream()
-    )
-    latest = None
-    for d in qs:
-        latest = d
-    return latest
+def _get_latest_version(db, space_id: str):
+    # Get all versions for this space and sort in memory to avoid index requirement
+    docs = list(db.collection("tree_versions").where("space_id", "==", space_id).stream())
+
+    if not docs:
+        return None
+
+    # Sort by created_at descending and return the first (latest) one
+    docs.sort(key=lambda d: (d.to_dict() or {}).get("created_at", ""), reverse=True)
+    return docs[0]
 
 
-def _next_version_number(db) -> int:
+def _next_version_number(db, space_id: str) -> int:
     # Fetch latest to derive next version number
-    latest = _get_latest_version(db)
+    latest = _get_latest_version(db, space_id)
     if latest is None:
         return 1
     data = latest.to_dict() or {}
@@ -227,9 +226,18 @@ def _next_version_number(db) -> int:
 def list_versions(request: Request, username: str = Depends(get_current_username)):
     _ensure_auth_header(request)
     db = get_db()
+
+    # Get user's current space
+    space_id = _get_user_space(username)
+
     out: List[TreeVersionInfo] = []
-    # Load global versions (not user-specific)
-    for d in db.collection("tree_versions").order_by("created_at", direction="DESCENDING").stream():
+    # Load space-specific versions - temporarily without ordering to avoid index requirement
+    docs = list(db.collection("tree_versions").where("space_id", "==", space_id).stream())
+
+    # Sort in memory by created_at descending
+    docs.sort(key=lambda d: (d.to_dict() or {}).get("created_at", ""), reverse=True)
+
+    for d in docs:
         data = d.to_dict() or {}
         out.append(
             TreeVersionInfo(
@@ -247,17 +255,21 @@ def unsaved_changes(request: Request, username: str = Depends(get_current_userna
     _ensure_auth_header(request)
     db = get_db()
 
-    # Check if there's an active version pointer
-    active_version_doc = db.collection("tree_state").document("active_version").get()
-    current_relations = _snapshot_relations(db)
+    # Get user's current space
+    space_id = _get_user_space(username)
+
+    # Check if there's a space-specific active version pointer
+    active_version_doc = db.collection("tree_state").document(f"active_version_{space_id}").get()
+    current_relations = _snapshot_relations(db, space_id)
 
     # Debug info
+    print(f"DEBUG: space_id = {space_id}")
     print(f"DEBUG: active_version_doc.exists = {active_version_doc.exists}")
     print(f"DEBUG: current_relations count = {len(current_relations)}")
 
     if not active_version_doc.exists:
         # No active version set
-        latest = _get_latest_version(db)
+        latest = _get_latest_version(db, space_id)
         print(f"DEBUG: latest version exists = {latest is not None}")
         if latest is None:
             # No versions exist yet - current state is the baseline
@@ -265,8 +277,10 @@ def unsaved_changes(request: Request, username: str = Depends(get_current_userna
             return {"unsaved": False}
 
         # Set latest as active version for future calls
-        db.collection("tree_state").document("active_version").set({"version_id": latest.id})
-        print(f"DEBUG: Set active version to {latest.id}")
+        db.collection("tree_state").document(f"active_version_{space_id}").set(
+            {"version_id": latest.id, "space_id": space_id}
+        )
+        print(f"DEBUG: Set active version to {latest.id} for space {space_id}")
 
         # Compare current state to this latest version
         latest_data = latest.to_dict() or {}
@@ -297,14 +311,44 @@ def unsaved_changes(request: Request, username: str = Depends(get_current_userna
         return {"unsaved": True}
 
     version_data = version_doc.to_dict() or {}
+
+    # CRITICAL: Validate space ownership of the version
+    version_space_id = version_data.get("space_id")
+    if version_space_id != space_id:
+        print(
+            f"WARNING: Active version belongs to space {version_space_id}, user in space {space_id}"
+        )
+        # Reset to no active version for this space and return unsaved
+        return {"unsaved": True}
+
     active_relations = version_data.get("relations") or []
     print(f"DEBUG: active_relations count = {len(active_relations)}")
 
-    # Debug: show first few relations from each to compare
-    print(f"DEBUG: First 3 current: {current_relations[:3] if current_relations else []}")
-    print(f"DEBUG: First 3 active: {active_relations[:3] if active_relations else []}")
+    # Normalize both relation lists for comparison
+    def normalize_relations(relations):
+        normalized = []
+        for rel in relations:
+            normalized.append(
+                {
+                    "parent_id": rel.get("parent_id"),
+                    "child_id": rel.get("child_id"),
+                    "space_id": space_id,  # Ensure consistent space context
+                }
+            )
+        # Sort for consistent comparison
+        normalized.sort(key=lambda x: (str(x.get("parent_id", "")), str(x.get("child_id", ""))))
+        return normalized
 
-    result = active_relations != current_relations
+    current_normalized = normalize_relations(current_relations)
+    active_normalized = normalize_relations(active_relations)
+
+    # Debug: show first few relations from each to compare
+    print(
+        f"DEBUG: First 3 current normalized: {current_normalized[:3] if current_normalized else []}"
+    )
+    print(f"DEBUG: First 3 active normalized: {active_normalized[:3] if active_normalized else []}")
+
+    result = active_normalized != current_normalized
     print(f"DEBUG: Final comparison - unsaved = {result}")
     return {"unsaved": result}
 
@@ -313,14 +357,20 @@ def unsaved_changes(request: Request, username: str = Depends(get_current_userna
 def save_tree(request: Request, username: str = Depends(get_current_username)):
     _ensure_auth_header(request)
     db = get_db()
-    rels = _snapshot_relations(db)
+
+    # Get user's current space
+    space_id = _get_user_space(username)
+
+    rels = _snapshot_relations(db, space_id)
     doc = db.collection("tree_versions").document()
     created_at = to_iso_string(utc_now())
-    version = _next_version_number(db)
-    doc.set({"created_at": created_at, "relations": rels, "version": version})
+    version = _next_version_number(db, space_id)
+    doc.set({"created_at": created_at, "relations": rels, "version": version, "space_id": space_id})
 
-    # Set this new version as the active version
-    db.collection("tree_state").document("active_version").set({"version_id": doc.id})
+    # Set this new version as the space-specific active version
+    db.collection("tree_state").document(f"active_version_{space_id}").set(
+        {"version_id": doc.id, "space_id": space_id, "updated_at": created_at}
+    )
 
     return TreeVersionInfo(id=doc.id, created_at=created_at, version=version)
 
@@ -333,19 +383,29 @@ def recover_tree(
 ):
     _ensure_auth_header(request)
     db = get_db()
+
+    # Get user's current space
+    space_id = _get_user_space(username)
+
     doc = db.collection("tree_versions").document(req.version_id).get()
     if not doc.exists:
         raise HTTPException(status_code=404, detail="Version not found")
     data = doc.to_dict() or {}
     rels: List[Dict[str, Optional[str]]] = data.get("relations") or []
-    # Replace relations collection with saved snapshot
-    # Delete all existing relations
-    for d in db.collection("relations").stream():
+
+    # Replace relations collection with saved snapshot - SPACE-AWARE
+    # Delete only existing relations for this user's space
+    for d in db.collection("relations").where("space_id", "==", space_id).stream():
         db.collection("relations").document(d.id).delete()
-    # Write snapshot
+
+    # Write snapshot with space_id included
     for item in rels:
         db.collection("relations").add(
-            {"parent_id": item.get("parent_id"), "child_id": item.get("child_id")}
+            {
+                "parent_id": item.get("parent_id"),
+                "child_id": item.get("child_id"),
+                "space_id": space_id,
+            }
         )
 
     # Set this version as the active version (key change!)

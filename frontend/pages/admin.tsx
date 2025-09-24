@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import TopNav from '../components/TopNav';
 import { API_BASE } from '../lib/api';
-import AdminCacheManager from '../lib/adminCache';
-import AdminCacheStatsDisplay from '../components/AdminCacheStatsDisplay';
+import LoadingOverlay from '../components/LoadingOverlay';
 
 interface UserItem {
   id: string;
@@ -17,8 +16,8 @@ interface UserItem {
 export default function AdminPage() {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showCacheStats, setShowCacheStats] = useState(false);
 
   // Helper function to format epoch seconds to local datetime
   const formatDateTime = (epochSeconds?: number) => {
@@ -39,15 +38,6 @@ export default function AdminPage() {
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       if (!token) {
         window.location.href = '/login';
-        return;
-      }
-
-      // Check cache first
-      const cacheManager = AdminCacheManager.getInstance();
-      const cachedUsers = cacheManager.getCachedUsers();
-      if (cachedUsers) {
-        setUsers(cachedUsers);
-        setLoading(false);
         return;
       }
 
@@ -77,8 +67,6 @@ export default function AdminPage() {
       if (!res.ok) throw new Error(`${res.status}`);
       const data = await res.json();
 
-      // Cache the users data
-      cacheManager.setCachedUsers(data.users || []);
       setUsers(data.users || []);
     } catch (e: any) {
       setError(e?.message || 'Failed to load');
@@ -92,6 +80,7 @@ export default function AdminPage() {
   }, []);
 
   async function act(path: string) {
+    setActionLoading(true);
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       if (!token) return;
@@ -102,14 +91,12 @@ export default function AdminPage() {
       }
       if (!res.ok) throw new Error(`${res.status}`);
 
-      // Invalidate cache after any admin action
-      const cacheManager = AdminCacheManager.getInstance();
-      cacheManager.invalidateAfterAdminAction();
-
       // Reload data
       await load();
     } catch (e: any) {
       alert(e?.message || 'Action failed');
+    } finally {
+      setActionLoading(false);
     }
   }
 
@@ -119,20 +106,6 @@ export default function AdminPage() {
       <div className="container" style={{ padding: '16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h1>Admin</h1>
-          <button
-            onClick={() => setShowCacheStats(true)}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            Cache Settings
-          </button>
         </div>
         <h2>Users</h2>
         {loading && <div>Loading users…</div>}
@@ -245,13 +218,16 @@ export default function AdminPage() {
         )}
       </div>
 
-      {/* Cache Settings Modal */}
-      {showCacheStats && (
-        <AdminCacheStatsDisplay
-          show={showCacheStats}
-          onClose={() => setShowCacheStats(false)}
-        />
-      )}
+      {/* Loading Overlays */}
+      <LoadingOverlay
+        isLoading={loading}
+        message="Loading admin panel..."
+      />
+      <LoadingOverlay
+        isLoading={actionLoading}
+        message="Processing action..."
+        transparent={true}
+      />
     </div>
   );
 }

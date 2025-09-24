@@ -4,7 +4,7 @@ import TopNav from '../components/TopNav';
 import { api } from '../lib/api';
 import { useState, useEffect } from 'react';
 import Modal from '../components/Modal';
-import TreeCacheManager from '../lib/treeCache';
+import LoadingOverlay from '../components/LoadingOverlay';
 
 export default function AddMemberPage(){
   const router = useRouter();
@@ -19,30 +19,28 @@ export default function AddMemberPage(){
   const [spouseId, setSpouseId] = useState<string>('');
   const [hasFormChanges, setHasFormChanges] = useState(false);
   const [hasSpouseChange, setHasSpouseChange] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    async function loadConfig() {
+    async function loadData() {
+      setLoading(true);
       try {
+        // Load config
         const configData = await api('/config');
         setConfig(configData);
-      } catch (e) {
-        console.error('Failed to load config:', e);
-      }
-    }
-    loadConfig();
-  }, []);
 
-  useEffect(() => {
-    async function loadTreeData() {
-      try {
+        // Load tree data
         const tree = await api('/tree');
         setTreeData(tree);
         setAllMembers(tree.members || []);
       } catch (e) {
-        console.error('Failed to load tree data:', e);
+        console.error('Failed to load data:', e);
+      } finally {
+        setLoading(false);
       }
     }
-    loadTreeData();
+    loadData();
   }, []);
 
   // Helper function to get all member IDs that are part of the tree structure
@@ -74,16 +72,13 @@ export default function AddMemberPage(){
   const hasChanges = hasFormChanges || hasSpouseChange;
 
   async function onSave(m:any){
+    setSaving(true);
     try{
       const body = normalizePayload(titleCaseAll({
         ...m,
         spouse_id: spouseId || undefined
       }));
       await api('/tree/members', { method:'POST', body: JSON.stringify(body) });
-
-      // Invalidate tree cache since we added a new member
-      const cacheManager = TreeCacheManager.getInstance();
-      cacheManager.invalidateCache('structure_changed');
 
       router.push('/');
     }catch(e:any){
@@ -105,6 +100,8 @@ export default function AddMemberPage(){
         }
       }catch{}
       setError(msg || 'Failed to add member');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -199,6 +196,17 @@ export default function AddMemberPage(){
           {invalidMsgs.map((m,i)=>(<li key={i}>{m}</li>))}
         </ul>
       </Modal>
+
+      {/* Loading Overlays */}
+      <LoadingOverlay
+        isLoading={loading}
+        message="Loading member data..."
+      />
+      <LoadingOverlay
+        isLoading={saving}
+        message="Saving member..."
+        transparent={true}
+      />
     </div>
   );
 }

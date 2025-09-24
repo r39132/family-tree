@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { api } from '../lib/api';
 import { useRouter } from 'next/router';
 import SimpleTopNav from '../components/SimpleTopNav';
+import LoadingOverlay from '../components/LoadingOverlay';
 
 export default function Register(){
   const [invite_code,setInvite]=useState('');
@@ -38,17 +39,17 @@ export default function Register(){
 
     setIsValidatingInvite(true);
     try {
-      const response = await api(`/auth/invites/${encodeURIComponent(code)}/validate`, {
+      const response = await api(`/auth/validate_invite?invite_code=${encodeURIComponent(code)}`, {
         method: 'GET'
       });
 
       if (!response.valid) {
         // Redirect to error page with specific error details
-        const errorType = response.error === 'already_redeemed' ? 'redeemed' :
+        const errorType = response.error === 'redeemed' ? 'redeemed' :
                          response.error === 'expired' ? 'expired' : 'invalid';
-        const errorMessage = response.message ||
-                           (response.error === 'already_redeemed' ?
-                            'This invite code has already been redeemed.' :
+        const errorMessage = response.error_message ||
+                           (response.error === 'redeemed' ?
+                            'Registration is not permitted with this token as it has already been redeemed. If you have already registered, please proceed to the login page.' :
                             'This invite code is invalid or has expired.');
 
         router.push(`/invite-error?type=${errorType}&message=${encodeURIComponent(errorMessage)}`);

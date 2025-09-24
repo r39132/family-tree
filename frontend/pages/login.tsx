@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { api } from '../lib/api';
 import { useRouter } from 'next/router';
 import SimpleTopNav from '../components/SimpleTopNav';
+import LoadingOverlay from '../components/LoadingOverlay';
 
 interface FamilySpace {
   id: string;
@@ -212,6 +213,13 @@ export default function Login(){
           </div>
         </form>
       </div>
+
+      {/* Loading Overlay */}
+      <LoadingOverlay
+        isLoading={loading}
+        message="Logging in..."
+        transparent={true}
+      />
     </div>
     </>
   );

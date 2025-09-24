@@ -6,8 +6,7 @@ import TopNav from '../components/TopNav';
 import { useRouter } from 'next/router';
 import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
-import TreeCacheManager from '../lib/treeCache';
-import CacheStatsDisplay from '../components/CacheStatsDisplay';
+import LoadingOverlay from '../components/LoadingOverlay';
 
 export default function Home(){
   const [tree,setTree]=useState<any>({roots:[],members:[]});
@@ -17,9 +16,10 @@ export default function Home(){
   const [unsaved, setUnsaved] = useState(false);
   const [versions, setVersions] = useState<any[]>([]);
   const [recoverId, setRecoverId] = useState<string>('');
-  const [showCacheStats, setShowCacheStats] = useState(false);
   const [config, setConfig] = useState<any>({ enable_map: false });
   const [treeView, setTreeView] = useState<'standard' | 'minimal' | 'horizontal' | 'cards'>('standard');
+  const [loading, setLoading] = useState(true);
+  const [operationLoading, setOperationLoading] = useState(false);
 
   function fmtVersionLabel(iso?: string, _count?: number, version?: number){
     if(!iso) return '';
@@ -37,38 +37,24 @@ export default function Home(){
   // logout handled in TopNav
 
   async function load(){
+    setLoading(true);
     try{
-      const cacheManager = TreeCacheManager.getInstance();
-
       // Load config
       const configData = await api('/config');
       setConfig(configData);
 
-      // Try to get cached tree data first
-      const cachedTree = cacheManager.getCachedTree();
-      if (cachedTree) {
-        setTree(cachedTree);
-        // Still load versions and unsaved state (these are small and change frequently)
-        const vs = await api('/tree/versions');
-        setVersions(vs);
-        const u = await api('/tree/unsaved');
-        setUnsaved(!!u.unsaved);
-        return;
-      }
-
-      // Cache miss - load fresh data
+      // Load versions and tree data
       const vs = await api('/tree/versions');
       setVersions(vs);
       const data = await api('/tree');
-
-      // Cache the tree data
-      cacheManager.setCachedTree(data);
       setTree(data);
 
       const u = await api('/tree/unsaved');
       setUnsaved(!!u.unsaved);
     }catch{
       router.push('/login');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -107,13 +93,6 @@ export default function Home(){
   if(!m.dob?.trim()) errs.push('Date of Birth is required.');
   if(errs.length){ setInvalidMsgs(errs); setShowInvalid(true); return; }
 
-  const cacheManager = TreeCacheManager.getInstance();
-
-  // Check if this update affects tree display
-  if (cacheManager.shouldInvalidateForMemberUpdate(m)) {
-    cacheManager.invalidateCache('data_changed');
-  }
-
   await api(`/tree/members/${m.id}`, {method:'PATCH', body:JSON.stringify(m)});
   setSelected(null);
   router.push('/');
@@ -121,46 +100,54 @@ export default function Home(){
   }
 
   async function move(){
-  const cacheManager = TreeCacheManager.getInstance();
-  cacheManager.invalidateCache('structure_changed');
-
-  await api('/tree/move',{method:'POST', body:JSON.stringify({child_id: moveChild, new_parent_id: moveParent || null})});
-    setMoveChild(''); setMoveParent(undefined);
-  setUnsaved(true);
-  await load();
+    setOperationLoading(true);
+    try {
+      await api('/tree/move',{method:'POST', body:JSON.stringify({child_id: moveChild, new_parent_id: moveParent || null})});
+      setMoveChild(''); setMoveParent(undefined);
+      setUnsaved(true);
+      await load();
+    } finally {
+      setOperationLoading(false);
+    }
   }
 
   async function remove(id:string){
     if(confirm('Are you sure you want to delete this member?')){
-      const cacheManager = TreeCacheManager.getInstance();
-      cacheManager.invalidateCache('structure_changed');
-
-      await api(`/tree/members/${id}`, {method:'DELETE'});
-      setSelected(null);
-      setUnsaved(true);
-      await load();
+      setOperationLoading(true);
+      try {
+        await api(`/tree/members/${id}`, {method:'DELETE'});
+        setSelected(null);
+        setUnsaved(true);
+        await load();
+      } finally {
+        setOperationLoading(false);
+      }
     }
   }
 
   async function saveTree(){
-    const cacheManager = TreeCacheManager.getInstance();
-    cacheManager.invalidateCache('structure_changed');
-
-    const v = await api('/tree/save', { method:'POST' });
-    setUnsaved(false);
-    const vs = await api('/tree/versions');
-    setVersions(vs);
+    setOperationLoading(true);
+    try {
+      const v = await api('/tree/save', { method:'POST' });
+      setUnsaved(false);
+      alert(`Tree saved! Version ${v.version}.`);
+      await load();
+    } finally {
+      setOperationLoading(false);
+    }
   }
 
   async function recoverTree(){
-    if(!recoverId) return;
-
-    const cacheManager = TreeCacheManager.getInstance();
-    cacheManager.invalidateCache('structure_changed');
-
-    await api('/tree/recover', { method:'POST', body: JSON.stringify({ version_id: recoverId }) });
-    setUnsaved(false);
-    await load();
+    setOperationLoading(true);
+    try {
+      await api('/tree/recover',{method:'POST',body:JSON.stringify({version_id:recoverId})});
+      setRecoverId('');
+      setUnsaved(false);
+      alert('Tree recovered from selected version.');
+      await load();
+    } finally {
+      setOperationLoading(false);
+    }
   }
 
   function Node({n}:{n:any}){
@@ -309,14 +296,6 @@ export default function Home(){
               <option value="cards">Cards</option>
             </select>
           </label>
-          <button
-            className="btn secondary"
-            onClick={() => setShowCacheStats(true)}
-            style={{ fontSize: '12px', padding: '4px 8px' }}
-            title="View cache settings and statistics"
-          >
-            📊 Cache
-          </button>
         </div>
       </div>
         {unsaved && (
@@ -324,14 +303,28 @@ export default function Home(){
         )}
         <div className="bottombar" style={{marginTop:8}}>
           <div className="bottombar-left">
-            <button className="btn" disabled={!unsaved} title={!unsaved ? 'No unsaved changes' : 'Save current tree as a new version'} onClick={saveTree}>Save Tree</button>
+            <button
+              className="btn"
+              disabled={!unsaved || operationLoading}
+              title={!unsaved ? 'No unsaved changes' : operationLoading ? 'Saving...' : 'Save current tree as a new version'}
+              onClick={saveTree}
+            >
+              {operationLoading ? 'Saving...' : 'Save Tree'}
+            </button>
           </div>
           <div className="bottombar-right" style={{display:'flex', gap:8, alignItems:'center'}}>
             <select value={recoverId} onChange={e=>setRecoverId(e.target.value)}>
               <option value="">Select version…</option>
               {versions.map((v:any)=> (<option key={v.id} value={v.id}>{fmtVersionLabel(v.created_at, undefined, v.version)}</option>))}
             </select>
-            <button className="btn" disabled={!recoverId} onClick={recoverTree}>Recover</button>
+            <button
+              className="btn"
+              disabled={!recoverId || operationLoading}
+              onClick={recoverTree}
+              title={operationLoading ? 'Recovering...' : 'Recover tree from selected version'}
+            >
+              {operationLoading ? 'Recovering...' : 'Recover'}
+            </button>
           </div>
         </div>
         {tree.roots?.length ? (
@@ -386,14 +379,28 @@ export default function Home(){
         <div className="bottombar">
           <div className="bottombar-left"></div>
           <div className="bottombar-right">
-            <button className="btn" onClick={move} disabled={!moveChild}>Move</button>
+            <button className="btn" onClick={move} disabled={!moveChild || operationLoading}>
+              {operationLoading ? 'Moving...' : 'Move'}
+            </button>
           </div>
         </div>
       </div>
 
       <div className="card">
         <h2>Add Spouse/Partner</h2>
-        <AddSpouse members={tree.members||[]} onLinked={async()=>{ await load(); setUnsaved(true); }} />
+        <AddSpouse
+          members={tree.members||[]}
+          onLinked={async()=>{
+            setOperationLoading(true);
+            try {
+              await load();
+              setUnsaved(true);
+            } finally {
+              setOperationLoading(false);
+            }
+          }}
+          loading={operationLoading}
+        />
       </div>
 
   {/* Edit is handled on a dedicated page */}
@@ -403,15 +410,21 @@ export default function Home(){
         </ul>
       </Modal>
 
-      <CacheStatsDisplay
-        show={showCacheStats}
-        onClose={() => setShowCacheStats(false)}
+      {/* Loading Overlays */}
+      <LoadingOverlay
+        isLoading={loading}
+        message="Loading family tree..."
+      />
+      <LoadingOverlay
+        isLoading={operationLoading}
+        message="Processing..."
+        transparent={true}
       />
     </div>
   );
 }
 
-function AddSpouse({members,onLinked}:{members:any[]; onLinked: ()=>void}){
+function AddSpouse({members,onLinked,loading}:{members:any[]; onLinked: ()=>void; loading?: boolean}){
   const [memberId, setMemberId] = useState('');
   const [partnerId, setPartnerId] = useState('');
   const canLink = memberId && partnerId && memberId !== partnerId;
@@ -424,10 +437,10 @@ function AddSpouse({members,onLinked}:{members:any[]; onLinked: ()=>void}){
     if(la<lb) return -1; if(la>lb) return 1; return 0;
   }), [members]);
   async function link(){
-    if(!canLink) return;
+    if(!canLink || loading) return;
     await api(`/tree/members/${memberId}/spouse`, { method:'POST', body: JSON.stringify({ spouse_id: partnerId }) });
     setMemberId(''); setPartnerId('');
-  onLinked();
+    onLinked();
   }
   return (
     <>
@@ -444,7 +457,9 @@ function AddSpouse({members,onLinked}:{members:any[]; onLinked: ()=>void}){
       <div className="bottombar">
         <div className="bottombar-left"></div>
         <div className="bottombar-right">
-          <button className="btn" onClick={link} disabled={!canLink}>Link</button>
+          <button className="btn" onClick={link} disabled={!canLink || loading}>
+            {loading ? 'Linking...' : 'Link'}
+          </button>
         </div>
       </div>
     </>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import TopNav from '../components/TopNav';
 import { api } from '../lib/api';
+import LoadingOverlay from '../components/LoadingOverlay';
 
 type Member = {
   id: string;
@@ -253,17 +254,6 @@ export default function MapPage() {
     );
   }
 
-  if (loading) {
-    return (
-      <div>
-        <TopNav />
-        <div style={{ padding: '20px', textAlign: 'center' }}>
-          <p>Loading map...</p>
-        </div>
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <div>
@@ -281,9 +271,9 @@ export default function MapPage() {
       <TopNav />
       <div style={{ padding: '20px' }}>
         <h1>Family Locations</h1>
-        {mapPins.length === 0 ? (
+        {!loading && mapPins.length === 0 ? (
           <p>No family members have residence locations set.</p>
-        ) : (
+        ) : !loading ? (
           <>
             <p>Showing {mapPins.length} family member{mapPins.length !== 1 ? 's' : ''} with known locations.</p>
             <div
@@ -296,8 +286,14 @@ export default function MapPage() {
               }}
             />
           </>
-        )}
+        ) : null}
       </div>
+
+      {/* Loading Overlay */}
+      <LoadingOverlay
+        isLoading={loading}
+        message="Loading map and geocoding addresses..."
+      />
     </div>
   );
 }
