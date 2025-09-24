@@ -212,8 +212,76 @@ def test_update_member_rejects_future_dob():
             json={"dob": "01/01/3000"},
             headers={"Authorization": "Bearer x"},
         )
-        assert r2.status_code == 400
-        assert "future" in (r2.json().get("detail") or "").lower()
+        assert r2.status_code == 422
+        assert "future" in (r2.json().get("detail")[0]["msg"] or "").lower()
+    finally:
+        routes_tree.get_db = orig_get_db
+        app.dependency_overrides.clear()
+
+
+def test_update_member_rejects_future_date_of_death():
+    from app import routes_tree
+    from app.deps import get_current_username
+
+    fake_db = FakeDB()
+
+    app.dependency_overrides[get_current_username] = lambda: "tester"
+    orig_get_db = routes_tree.get_db
+    routes_tree.get_db = lambda: fake_db
+
+    client = TestClient(app)
+    try:
+        # Create a member first
+        r = client.post(
+            "/tree/members",
+            json={"first_name": "Test", "last_name": "User", "dob": "01/01/2000"},
+            headers={"Authorization": "Bearer x"},
+        )
+        assert r.status_code == 200
+        mid = r.json()["id"]
+
+        # Try to update with future date of death
+        r2 = client.patch(
+            f"/tree/members/{mid}",
+            json={"date_of_death": "01/01/3000"},
+            headers={"Authorization": "Bearer x"},
+        )
+        assert r2.status_code == 422
+        assert "future" in (r2.json().get("detail")[0]["msg"] or "").lower()
+    finally:
+        routes_tree.get_db = orig_get_db
+        app.dependency_overrides.clear()
+
+
+def test_update_member_rejects_death_before_birth():
+    from app import routes_tree
+    from app.deps import get_current_username
+
+    fake_db = FakeDB()
+
+    app.dependency_overrides[get_current_username] = lambda: "tester"
+    orig_get_db = routes_tree.get_db
+    routes_tree.get_db = lambda: fake_db
+
+    client = TestClient(app)
+    try:
+        # Create a member first
+        r = client.post(
+            "/tree/members",
+            json={"first_name": "Test", "last_name": "User", "dob": "01/01/2000"},
+            headers={"Authorization": "Bearer x"},
+        )
+        assert r.status_code == 200
+        mid = r.json()["id"]
+
+        # Try to update with death date before birth date
+        r2 = client.patch(
+            f"/tree/members/{mid}",
+            json={"dob": "01/01/2000", "date_of_death": "01/01/1999"},
+            headers={"Authorization": "Bearer x"},
+        )
+        assert r2.status_code == 422
+        assert "later" in (r2.json().get("detail")[0]["msg"] or "").lower()
     finally:
         routes_tree.get_db = orig_get_db
         app.dependency_overrides.clear()

@@ -43,6 +43,7 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
       normalize(m.middle_name) !== normalize(member.middle_name) ||
       normalize(m.last_name) !== normalize(member.last_name) ||
       normalize(m.dob) !== normalize(member.dob) ||
+      normalize(m.date_of_death) !== normalize(member.date_of_death) ||
       normalize(m.birth_location) !== normalize(member.birth_location) ||
       normalize(m.residence_location) !== normalize(member.residence_location) ||
       normalize(m.email) !== normalize(member.email) ||
@@ -81,6 +82,10 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
     }
     if(values.first_name && !nameRe.test(values.first_name.trim())) errs.first_name = 'Only letters and - are allowed.';
     if(values.last_name && !nameRe.test(values.last_name.trim())) errs.last_name = 'Only letters and - are allowed.';
+
+    let dobDate: Date | null = null;
+    let dodDate: Date | null = null;
+
     if(values.dob){
       const dobVal = values.dob.trim();
       if(!dobRe.test(dobVal)){
@@ -93,9 +98,35 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
         const todayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
         if(dt.getTime() > todayUTC.getTime()){
           errs.dob = 'Date of Birth cannot be in the future.';
+        } else {
+          dobDate = dt;
         }
       }
     }
+
+    if(values.date_of_death && values.date_of_death.trim()){
+      const dodVal = values.date_of_death.trim();
+      if(!dobRe.test(dodVal)){
+        errs.date_of_death = 'Use MM/DD/YYYY format.';
+      }else{
+        // Disallow future dates
+        const [mm,dd,yyyy] = dodVal.split('/').map((s:string)=>parseInt(s,10));
+        const dt = new Date(Date.UTC(yyyy, mm-1, dd, 0, 0, 0));
+        const today = new Date();
+        const todayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+        if(dt.getTime() > todayUTC.getTime()){
+          errs.date_of_death = 'Date of Death cannot be in the future.';
+        } else {
+          dodDate = dt;
+        }
+      }
+    }
+
+    // Validate that death date is after birth date
+    if(dobDate && dodDate && dodDate.getTime() <= dobDate.getTime()){
+      errs.date_of_death = 'Date of Death must be later than Date of Birth.';
+    }
+
     if(values.email && !emailRe.test(values.email.trim())) errs.email = 'Error: Not a valid email format';
     return errs;
   }
@@ -112,7 +143,7 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
       merged[k] = v;
     }
     setErrors(merged);
-  },[m.first_name, m.last_name, m.dob, m.email, requireBasics, externalErrors]);
+  },[m.first_name, m.last_name, m.dob, m.date_of_death, m.email, requireBasics, externalErrors]);
 
   function save(e:any){
     e.preventDefault();
@@ -142,6 +173,18 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
         <label>Middle Name<input className="input" placeholder="Middle Name" value={m.middle_name||''} onChange={e=>ch('middle_name',e.target.value)}/></label>
   <label>Last Name <sup style={{color:'crimson'}}>*</sup><input className="input" placeholder="Last Name" value={m.last_name||''} onChange={e=>ch('last_name',e.target.value)}/>{errors.last_name && <span className="error">{errors.last_name}</span>}</label>
   <label>Date of Birth (MM/DD/YYYY) <sup style={{color:'crimson'}}>*</sup><input className="input" placeholder="MM/DD/YYYY" value={m.dob||''} onChange={e=>ch('dob', fmtDob(e.target.value))}/>{errors.dob && <span className="error">{errors.dob}</span>}</label>
+  <label>
+    Date of Death (MM/DD/YYYY)
+    <input
+      className="input"
+      placeholder="MM/DD/YYYY"
+      value={m.date_of_death||''}
+      onChange={e=>ch('date_of_death', fmtDob(e.target.value))}
+      disabled={!m.is_deceased}
+      style={{opacity: m.is_deceased ? 1 : 0.5}}
+    />
+    {errors.date_of_death && <span className="error">{errors.date_of_death}</span>}
+  </label>
     <label>Birth Location<input className="input" placeholder="Birth Location" value={m.birth_location||''} onChange={e=>ch('birth_location',e.target.value)}/></label>
     <label>
       Residence Location
@@ -180,7 +223,14 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
       </div>
     )}
   </label>
-  <label><input type="checkbox" checked={!!m.is_deceased} onChange={e=>ch('is_deceased', e.target.checked)} /> Deceased</label>
+  <label><input type="checkbox" checked={!!m.is_deceased} onChange={e=>{
+    const isDeceased = e.target.checked;
+    ch('is_deceased', isDeceased);
+    // Clear date of death when unchecking deceased status
+    if (!isDeceased) {
+      ch('date_of_death', '');
+    }
+  }} /> Deceased</label>
       </div>
       {!hideSubmit && (
         <div className="nav"><button className="btn" type="submit" disabled={Object.keys(errors).length>0}>Save</button></div>

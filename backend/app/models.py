@@ -47,6 +47,7 @@ class Member(BaseModel):
     dob: Optional[str] = None
     spouse_id: Optional[str] = None
     is_deceased: Optional[bool] = False
+    date_of_death: Optional[str] = None
     birth_location: Optional[str] = None
     residence_location: Optional[str] = None
     email: Optional[EmailStr] = None
@@ -210,11 +211,47 @@ class UpdateMember(BaseModel):
     spouse_id: Optional[str] = None
     is_deceased: Optional[bool] = None
     middle_name: Optional[str] = None
+    date_of_death: Optional[str] = None
     birth_location: Optional[str] = None
     residence_location: Optional[str] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     hobbies: Optional[List[str]] = None
+
+    @field_validator("dob", "date_of_death")
+    @classmethod
+    def _validate_past_date_update(cls, v: Optional[str]):
+        if v is None or not v.strip():
+            return v
+        try:
+            date = datetime.strptime(v, "%m/%d/%Y").replace(tzinfo=timezone.utc)
+        except Exception:
+            return v
+
+        if date > utc_now():
+            raise ValueError("This date cannot be in the future")
+
+        return v
+
+    @field_validator("date_of_death")
+    @classmethod
+    def _validate_date_of_death_after_dob_update(cls, v: Optional[str], info: ValidationInfo):
+        if v is None or not v.strip():
+            return v
+        dob = info.data.get("dob")
+        if dob is None or not dob.strip():
+            return v  # Can't validate relationship if no dob provided
+        try:
+            dates = [
+                datetime.strptime(x, "%m/%d/%Y").replace(tzinfo=timezone.utc) for x in [v, dob]
+            ]
+        except Exception:
+            return v
+
+        if dates[0] <= dates[1]:
+            raise ValueError("Date of Death must be later than Date of Birth.")
+
+        return v
 
 
 class EventNotificationSettings(BaseModel):
