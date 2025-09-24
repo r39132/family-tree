@@ -16,6 +16,12 @@ def test_backfill_versions_assigns_in_order():
 
     # Set up fake database and authentication overrides
     fake_db = FakeDB()
+
+    # Create a test user document with current_space
+    fake_db.collection("users").document("tester").set(
+        {"current_space": "test_space_123", "username": "tester"}
+    )
+
     orig_db = app.dependency_overrides.get(real_get_db)
     orig_user = app.dependency_overrides.get(get_current_username)
     app.dependency_overrides[real_get_db] = lambda: fake_db

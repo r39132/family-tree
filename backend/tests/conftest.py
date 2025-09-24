@@ -126,6 +126,7 @@ class FakeDB:
             "member_keys": FakeCollection("member_keys", self),
             "tree_versions": FakeCollection("tree_versions", self),
             "tree_state": FakeCollection("tree_state", self),
+            "users": FakeCollection("users", self),
         }
 
     def collection(self, name):
