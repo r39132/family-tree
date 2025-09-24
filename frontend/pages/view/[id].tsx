@@ -56,7 +56,26 @@ export default function ViewMemberPage(){
             <Field label="Middle Name" value={member.middle_name} />
             <Field label="Last Name" value={member.last_name} />
             <Field label="Date of Birth" value={member.dob} />
-            <Field label="Birth Location" value={member.birth_location} />
+            <Field
+              label="Birth Location"
+              value={
+                member.birth_location ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>{member.birth_location}</span>
+                    {config.enable_map && (
+                      <button
+                        className="btn secondary"
+                        style={{ fontSize: '12px', padding: '4px 8px' }}
+                        onClick={() => router.push(`/map?layer=birth&member=${member.id}`)}
+                        aria-label="View birthplace on map"
+                      >
+                        View on Map
+                      </button>
+                    )}
+                  </div>
+                ) : '-'
+              }
+            />
             <Field
               label="Residence Location"
               value={
@@ -67,7 +86,8 @@ export default function ViewMemberPage(){
                       <button
                         className="btn secondary"
                         style={{ fontSize: '12px', padding: '4px 8px' }}
-                        onClick={() => router.push(`/map?member=${member.id}`)}
+                        onClick={() => router.push(`/map?layer=residence&member=${member.id}`)}
+                        aria-label="View residence on map"
                       >
                         View on Map
                       </button>

@@ -8,6 +8,7 @@ type Member = {
   id: string;
   first_name: string;
   last_name: string;
+  birth_location?: string;
   residence_location?: string;
 };
 
@@ -20,6 +21,8 @@ type MapPin = {
   lng: number;
 };
 
+type LayerType = 'residence' | 'birth';
+
 declare global {
   interface Window {
     google: any;
@@ -29,17 +32,57 @@ declare global {
 
 export default function MapPage() {
   const router = useRouter();
-  const { member: focusMemberId } = router.query as { member?: string };
+  const {
+    member: focusMemberId,
+    layer: layerParam = 'residence',
+    addr: addressParam
+  } = router.query as {
+    member?: string;
+    layer?: LayerType;
+    addr?: string;
+  };
+
   const [members, setMembers] = useState<Member[]>([]);
   const [mapPins, setMapPins] = useState<MapPin[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [mapReady, setMapReady] = useState(false);
   const [mapConfig, setMapConfig] = useState({ enable_map: false, google_maps_api_key: '' });
+  const [currentLayer, setCurrentLayer] = useState<LayerType>(layerParam);
+  const [geocodingCache, setGeocodingCache] = useState<Map<string, { lat: number; lng: number }>>(new Map());
+  const [toastMessage, setToastMessage] = useState<string>('');
 
   useEffect(() => {
     checkMapConfig();
   }, []);
+
+  // Update layer when URL param changes
+  useEffect(() => {
+    setCurrentLayer(layerParam);
+  }, [layerParam]);
+
+  // Handle layer switching
+  function handleLayerChange(newLayer: LayerType) {
+    setCurrentLayer(newLayer);
+
+    // Update URL with new layer
+    const newQuery: any = { ...router.query, layer: newLayer };
+    if (!focusMemberId && !addressParam) {
+      // Remove member and addr params when switching layers without specific focus
+      delete newQuery.member;
+      delete newQuery.addr;
+    }
+
+    router.push({
+      pathname: '/map',
+      query: newQuery,
+    }, undefined, { shallow: true });
+  }
+
+  function showToast(message: string) {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(''), 5000);
+  }
 
   async function checkMapConfig() {
     try {
@@ -68,12 +111,9 @@ export default function MapPage() {
   async function loadMembers() {
     try {
       const data = await api('/tree');
-      const membersWithLocation = (data.members || []).filter((m: Member) =>
-        m.residence_location && m.residence_location.trim()
-      );
-
-      setMembers(membersWithLocation);
-      await geocodeAddresses(membersWithLocation);
+      const allMembers = data.members || [];
+      setMembers(allMembers);
+      await geocodeAddressesForLayer(allMembers, currentLayer);
     } catch (e: any) {
       if (e?.message?.includes('401')) {
         router.push('/login');
@@ -85,45 +125,115 @@ export default function MapPage() {
     }
   }
 
-  async function geocodeAddresses(members: Member[]) {
+  async function geocodeAddressesForLayer(members: Member[], layer: LayerType) {
     if (!window.google) {
       setError('Google Maps is not loaded');
       return;
     }
 
+    const locationField = layer === 'birth' ? 'birth_location' : 'residence_location';
+    const membersWithLocation = members.filter((m: Member) =>
+      m[locationField] && m[locationField]!.trim()
+    );
+
     const geocoder = new window.google.maps.Geocoder();
     const pins: MapPin[] = [];
 
-    for (const member of members) {
+    for (const member of membersWithLocation) {
+      const address = member[locationField]!;
+      const cacheKey = `${layer}-${member.id}`;
+
       try {
+        let location;
+
+        // Check cache first
+        if (geocodingCache.has(cacheKey)) {
+          const cached = geocodingCache.get(cacheKey)!;
+          location = { lat: () => cached.lat, lng: () => cached.lng };
+        } else {
+          // Geocode the address
+          const result = await new Promise<any>((resolve, reject) => {
+            geocoder.geocode(
+              { address: address },
+              (results: any[], status: string) => {
+                if (status === 'OK' && results && results.length > 0) {
+                  resolve(results[0]);
+                } else {
+                  reject(new Error(`Geocoding failed for ${member.first_name}: ${status}`));
+                }
+              }
+            );
+          });
+
+          location = result.geometry.location;
+
+          // Cache the result
+          const newCache = new Map(geocodingCache);
+          newCache.set(cacheKey, { lat: location.lat(), lng: location.lng() });
+          setGeocodingCache(newCache);
+        }
+
+        pins.push({
+          id: member.id,
+          firstName: member.first_name,
+          fullName: `${member.first_name} ${member.last_name}`,
+          address: address,
+          lat: location.lat(),
+          lng: location.lng()
+        });
+      } catch (e) {
+        console.warn(`Could not geocode ${layer} address for ${member.first_name}:`, e);
+      }
+    }
+
+    setMapPins(pins);
+  }
+
+  // Handle address geocoding from URL parameter
+  async function geocodeAddressParam(address: string) {
+    if (!window.google || !address) return null;
+
+    const cacheKey = `addr-${address}`;
+
+    try {
+      let location;
+
+      // Check cache first
+      if (geocodingCache.has(cacheKey)) {
+        const cached = geocodingCache.get(cacheKey)!;
+        location = { lat: () => cached.lat, lng: () => cached.lng };
+      } else {
+        const geocoder = new window.google.maps.Geocoder();
         const result = await new Promise<any>((resolve, reject) => {
           geocoder.geocode(
-            { address: member.residence_location },
+            { address: decodeURIComponent(address) },
             (results: any[], status: string) => {
               if (status === 'OK' && results && results.length > 0) {
                 resolve(results[0]);
               } else {
-                reject(new Error(`Geocoding failed for ${member.first_name}: ${status}`));
+                reject(new Error(`Could not find location: ${status}`));
               }
             }
           );
         });
 
-        const location = result.geometry.location;
-        pins.push({
-          id: member.id,
-          firstName: member.first_name,
-          fullName: `${member.first_name} ${member.last_name}`,
-          address: member.residence_location || '',
-          lat: location.lat(),
-          lng: location.lng()
-        });
-      } catch (e) {
-        console.warn(`Could not geocode address for ${member.first_name}:`, e);
-      }
-    }
+        location = result.geometry.location;
 
-    setMapPins(pins);
+        // Cache the result
+        const newCache = new Map(geocodingCache);
+        newCache.set(cacheKey, { lat: location.lat(), lng: location.lng() });
+        setGeocodingCache(newCache);
+      }
+
+      return {
+        lat: location.lat(),
+        lng: location.lng(),
+        address: decodeURIComponent(address)
+      };
+    } catch (e) {
+      showToast("We couldn't find that location.");
+      return null;
+    }
   }
 
   useEffect(() => {
@@ -150,9 +260,16 @@ export default function MapPage() {
     if (!mapReady) return;
 
     initializeMap();
-  }, [mapReady, mapPins]);
+  }, [mapReady, mapPins, focusMemberId, addressParam]);
 
-  function initializeMap() {
+  // Reload data when layer changes
+  useEffect(() => {
+    if (members.length > 0 && mapReady) {
+      geocodeAddressesForLayer(members, currentLayer);
+    }
+  }, [currentLayer, mapReady]);
+
+  async function initializeMap() {
     const mapElement = document.getElementById('map');
     if (!mapElement || !window.google) return;
 
@@ -161,22 +278,49 @@ export default function MapPage() {
     let mapCenter = defaultCenter;
     let mapZoom = 10;
 
-    // If we have pins, calculate bounds and center
-    if (mapPins.length > 0) {
-      const bounds = new window.google.maps.LatLngBounds();
-      mapPins.forEach(pin => {
-        bounds.extend(new window.google.maps.LatLng(pin.lat, pin.lng));
-      });
-      mapCenter = bounds.getCenter().toJSON();
-    }
-
     const map = new window.google.maps.Map(mapElement, {
       zoom: mapZoom,
       center: mapCenter,
       mapTypeId: window.google.maps.MapTypeId.ROADMAP,
     });
 
-    // Fit map to show all pins or focus on specific member
+    // Handle address parameter (from Add Member page)
+    if (addressParam) {
+      const addressLocation = await geocodeAddressParam(addressParam);
+      if (addressLocation) {
+        map.setCenter({ lat: addressLocation.lat, lng: addressLocation.lng });
+        map.setZoom(15);
+
+        // Create temporary marker for the address
+        const tempMarker = new window.google.maps.Marker({
+          position: { lat: addressLocation.lat, lng: addressLocation.lng },
+          map: map,
+          title: 'Location Preview',
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: '#4285f4',
+            fillOpacity: 0.8,
+            strokeColor: '#ffffff',
+            strokeWeight: 3
+          }
+        });
+
+        const tempInfoWindow = new window.google.maps.InfoWindow({
+          content: `
+            <div style="padding: 8px;">
+              <h4 style="margin: 0 0 4px 0;">Location Preview</h4>
+              <p style="margin: 0; color: #666;">${addressLocation.address}</p>
+            </div>
+          `
+        });
+
+        tempInfoWindow.open(map, tempMarker);
+      }
+      return;
+    }
+
+    // Handle member focus or show all pins
     const focusPin = focusMemberId ? mapPins.find(pin => pin.id === focusMemberId) : null;
 
     if (focusPin) {
@@ -190,6 +334,10 @@ export default function MapPage() {
         bounds.extend(new window.google.maps.LatLng(pin.lat, pin.lng));
       });
       map.fitBounds(bounds);
+    } else if (mapPins.length === 1) {
+      // Center on single pin
+      map.setCenter({ lat: mapPins[0].lat, lng: mapPins[0].lng });
+      map.setZoom(12);
     }
 
     // Create markers for each pin
@@ -211,12 +359,17 @@ export default function MapPage() {
         } : undefined
       });
 
-      // Create info window for hover
+      // Create info window
       const infoWindow = new window.google.maps.InfoWindow({
         content: `
           <div style="padding: 8px;">
             <h4 style="margin: 0 0 4px 0;">${pin.fullName}</h4>
-            <p style="margin: 0; color: #666;">${pin.address}</p>
+            <p style="margin: 0; color: #666;">
+              ${currentLayer === 'birth' ? 'Born in' : 'Lives in'}: ${pin.address}
+            </p>
+            <a href="/view/${pin.id}" style="color: #1976d2; text-decoration: underline; font-size: 12px;">
+              View Profile
+            </a>
           </div>
         `
       });
@@ -270,12 +423,72 @@ export default function MapPage() {
     <div>
       <TopNav />
       <div style={{ padding: '20px' }}>
-        <h1>Family Locations</h1>
-        {!loading && mapPins.length === 0 ? (
-          <p>No family members have residence locations set.</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h1>Family Locations</h1>
+
+          {/* Layer Switcher */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label htmlFor="layer-select" style={{ fontSize: '14px', fontWeight: 'bold' }}>
+              Show:
+            </label>
+            <select
+              id="layer-select"
+              value={currentLayer}
+              onChange={(e) => handleLayerChange(e.target.value as LayerType)}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '4px',
+                border: '1px solid #ccc',
+                fontSize: '14px',
+                background: 'white'
+              }}
+              aria-label="Select location layer to display"
+            >
+              <option value="residence">Location of Residence</option>
+              <option value="birth">Location of Birth</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Content based on loading state */}
+        {!loading && mapPins.length === 0 && !addressParam ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+            <p>
+              {currentLayer === 'birth'
+                ? "No family members have birth locations set."
+                : "No family members have residence locations set."
+              }
+            </p>
+            <p style={{ fontSize: '14px' }}>
+              Add location information to member profiles to see them on the map.
+            </p>
+          </div>
         ) : !loading ? (
           <>
-            <p>Showing {mapPins.length} family member{mapPins.length !== 1 ? 's' : ''} with known locations.</p>
+            {mapPins.length > 0 && (
+              <p style={{ marginBottom: '16px', color: '#666' }}>
+                Showing {mapPins.length} family member{mapPins.length !== 1 ? 's' : ''} with known{' '}
+                {currentLayer === 'birth' ? 'birth' : 'residence'} locations.
+              </p>
+            )}
+            {addressParam && (
+              <p style={{ marginBottom: '16px', color: '#666' }}>
+                Previewing location for: <strong>{decodeURIComponent(addressParam)}</strong>
+              </p>
+            )}
+            {focusMemberId && mapPins.length > 0 && (
+              <p style={{ marginBottom: '16px', color: '#1976d2' }}>
+                <strong>Focused on:</strong>{' '}
+                {mapPins.find(p => p.id === focusMemberId)?.fullName || 'Selected member'}
+              </p>
+            )}
+            {focusMemberId && mapPins.length === 0 && !addressParam && (
+              <div style={{ textAlign: 'center', padding: '20px', backgroundColor: '#fff3cd', borderRadius: '4px', marginBottom: '16px' }}>
+                <p style={{ margin: 0, color: '#856404' }}>
+                  This member doesn't have a {currentLayer === 'birth' ? 'birth' : 'residence'} location yet.
+                </p>
+              </div>
+            )}
             <div
               id="map"
               style={{
@@ -288,6 +501,23 @@ export default function MapPage() {
           </>
         ) : null}
       </div>
+
+      {/* Toast notification */}
+      {toastMessage && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          backgroundColor: '#f44336',
+          color: 'white',
+          padding: '12px 16px',
+          borderRadius: '4px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          zIndex: 1000
+        }}>
+          {toastMessage}
+        </div>
+      )}
 
       {/* Loading Overlay */}
       <LoadingOverlay

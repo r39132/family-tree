@@ -142,7 +142,32 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
         <label>Middle Name<input className="input" placeholder="Middle Name" value={m.middle_name||''} onChange={e=>ch('middle_name',e.target.value)}/></label>
   <label>Last Name <sup style={{color:'crimson'}}>*</sup><input className="input" placeholder="Last Name" value={m.last_name||''} onChange={e=>ch('last_name',e.target.value)}/>{errors.last_name && <span className="error">{errors.last_name}</span>}</label>
   <label>Date of Birth (MM/DD/YYYY) <sup style={{color:'crimson'}}>*</sup><input className="input" placeholder="MM/DD/YYYY" value={m.dob||''} onChange={e=>ch('dob', fmtDob(e.target.value))}/>{errors.dob && <span className="error">{errors.dob}</span>}</label>
-    <label>Birth Location<input className="input" placeholder="Birth Location" value={m.birth_location||''} onChange={e=>ch('birth_location',e.target.value)}/></label>
+    <label>
+      Birth Location
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+        <input
+          className="input"
+          style={{ flex: 1 }}
+          placeholder="Birth Location"
+          value={m.birth_location||''}
+          onChange={e=>ch('birth_location',e.target.value)}
+        />
+        {config.enable_map && m.birth_location && m.birth_location.trim() && (
+          <button
+            type="button"
+            className="btn secondary"
+            style={{ fontSize: '12px', padding: '4px 8px', whiteSpace: 'nowrap' }}
+            onClick={() => {
+              const address = encodeURIComponent(m.birth_location.trim());
+              router.push(`/map?layer=birth&addr=${address}`);
+            }}
+            aria-label="View birthplace on map"
+          >
+            View on Map
+          </button>
+        )}
+      </div>
+    </label>
     <label>
       Residence Location
       <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
@@ -153,12 +178,16 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
           value={m.residence_location||''}
           onChange={e=>ch('residence_location',e.target.value)}
         />
-        {config.enable_map && m.residence_location && (
+        {config.enable_map && m.residence_location && m.residence_location.trim() && (
           <button
             type="button"
             className="btn secondary"
             style={{ fontSize: '12px', padding: '4px 8px', whiteSpace: 'nowrap' }}
-            onClick={() => router.push(`/map?member=${member.id}`)}
+            onClick={() => {
+              const address = encodeURIComponent(m.residence_location.trim());
+              router.push(`/map?layer=residence&addr=${address}`);
+            }}
+            aria-label="View residence on map"
           >
             View on Map
           </button>
