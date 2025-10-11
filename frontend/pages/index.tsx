@@ -7,6 +7,7 @@ import { useRouter } from 'next/router';
 import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
 import LoadingOverlay from '../components/LoadingOverlay';
+import { isEligibleForMarriage } from '../lib/dateUtils';
 
 export default function Home(){
   const [tree,setTree]=useState<any>({roots:[],members:[]});
@@ -428,7 +429,9 @@ function AddSpouse({members,onLinked,loading}:{members:any[]; onLinked: ()=>void
   const [memberId, setMemberId] = useState('');
   const [partnerId, setPartnerId] = useState('');
   const canLink = memberId && partnerId && memberId !== partnerId;
-  const sortedMembers = useMemo(()=> (members||[]).slice().sort((a:any,b:any)=>{
+  const sortedMembers = useMemo(()=> (members||[]).slice().filter((m:any)=>
+    isEligibleForMarriage(m.dob) // Filter to only show members 18 or older
+  ).sort((a:any,b:any)=>{
     const fa = (a.first_name||'').toLowerCase();
     const fb = (b.first_name||'').toLowerCase();
     if(fa<fb) return -1; if(fa>fb) return 1;

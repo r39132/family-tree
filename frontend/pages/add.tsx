@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { useState, useEffect } from 'react';
 import Modal from '../components/Modal';
 import LoadingOverlay from '../components/LoadingOverlay';
+import { isEligibleForMarriage } from '../lib/dateUtils';
 
 export default function AddMemberPage(){
   const router = useRouter();
@@ -167,7 +168,8 @@ export default function AddMemberPage(){
                 const membersInTree = getMembersInTree(treeData.roots || []);
                 return allMembers.filter(m =>
                   !m.spouse_id && // Not already married
-                  !membersInTree.has(m.id) // Not part of the family tree structure
+                  !membersInTree.has(m.id) && // Not part of the family tree structure
+                  isEligibleForMarriage(m.dob) // At least 18 years old
                 ).map((m:any)=>(
                   <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>
                 ));
