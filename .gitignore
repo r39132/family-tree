@@ -15,16 +15,16 @@ __pycache__/
 .venv/
 backend/__pycache__/
 backend/.pytest_cache/
-backend/.coverage
+# backend/.coverage
 backend/.mypy_cache/
 backend/.ruff_cache/
 backend/.env
-backend/coverage.xml
+# backend/coverage.xml
 backend/htmlcov/
 
 # Test artifacts
-.coverage
-coverage.xml
+# .coverage
+# coverage.xml
 htmlcov/
 .pytest_cache/
 *.cover
