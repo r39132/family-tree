@@ -9,13 +9,22 @@ from .utils.time import utc_now
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# Bcrypt has a 72-byte limit, so we truncate passwords to this length
+MAX_PASSWORD_BYTES = 72
+
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    # Truncate password to 72 bytes to comply with bcrypt limits
+    password_bytes = password.encode("utf-8")[:MAX_PASSWORD_BYTES]
+    truncated_password = password_bytes.decode("utf-8", errors="ignore")
+    return pwd_context.hash(truncated_password)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    # Truncate password to 72 bytes to comply with bcrypt limits
+    password_bytes = plain.encode("utf-8")[:MAX_PASSWORD_BYTES]
+    truncated_password = password_bytes.decode("utf-8", errors="ignore")
+    return pwd_context.verify(truncated_password, hashed)
 
 
 def create_access_token(subject: str, expires_minutes: Optional[int] = None) -> str:

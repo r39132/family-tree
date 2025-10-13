@@ -174,3 +174,32 @@ def test_reset_token_timezone_aware():
 
     # Allow some tolerance for timing precision
     assert abs((exp_dt - expected_exp).total_seconds()) < 5  # Within 5 seconds of expected
+
+
+def test_hash_password_long():
+    """Test that passwords longer than 72 bytes are properly truncated"""
+    # Create a password longer than 72 bytes
+    long_password = "a" * 100  # 100 characters = 100 bytes (for ASCII)
+    hashed = hash_password(long_password)
+
+    # Verify that the long password works
+    assert verify_password(long_password, hashed) is True
+
+    # Verify that a password with the same first 72 bytes verifies successfully
+    truncated = "a" * 72
+    assert verify_password(truncated, hashed) is True
+
+
+def test_hash_password_unicode():
+    """Test that passwords with unicode characters are properly handled"""
+    # Create a password with unicode characters that might exceed 72 bytes
+    # Each emoji is 4 bytes in UTF-8
+    unicode_password = "🔒" * 20  # 20 emojis = 80 bytes
+    hashed = hash_password(unicode_password)
+
+    # Verify that the unicode password works
+    assert verify_password(unicode_password, hashed) is True
+
+    # The password should be properly truncated to 72 bytes
+    assert hashed is not None
+    assert len(hashed) > 20
