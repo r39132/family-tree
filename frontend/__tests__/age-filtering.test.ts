@@ -7,25 +7,26 @@ import { calculateAge, isEligibleForMarriage } from '../lib/dateUtils';
 describe('Date Utility Functions', () => {
   describe('calculateAge', () => {
     it('calculates age correctly for MM/DD/YYYY format', () => {
-      const referenceDate = new Date('2025-10-11');
+      // Use explicit date construction to avoid timezone issues
+      const referenceDate = new Date(2025, 9, 11); // October 11, 2025 (month is 0-indexed)
       const dob = '10/11/2007'; // Exactly 18 years old today
       expect(calculateAge(dob, referenceDate)).toBe(18);
     });
 
     it('calculates age correctly when birthday has not occurred this year', () => {
-      const referenceDate = new Date('2025-10-11');
+      const referenceDate = new Date(2025, 9, 11); // October 11, 2025
       const dob = '10/12/2007'; // Birthday is tomorrow, still 17
       expect(calculateAge(dob, referenceDate)).toBe(17);
     });
 
     it('calculates age correctly when birthday has occurred this year', () => {
-      const referenceDate = new Date('2025-10-11');
+      const referenceDate = new Date(2025, 9, 11); // October 11, 2025
       const dob = '10/10/2007'; // Birthday was yesterday, now 18
       expect(calculateAge(dob, referenceDate)).toBe(18);
     });
 
     it('handles YYYY-MM-DD format', () => {
-      const referenceDate = new Date('2025-10-11');
+      const referenceDate = new Date(2025, 9, 11); // October 11, 2025
       const dob = '2007-10-11'; // Exactly 18 years old
       expect(calculateAge(dob, referenceDate)).toBe(18);
     });
@@ -47,13 +48,13 @@ describe('Date Utility Functions', () => {
     });
 
     it('calculates correct age for someone over 18', () => {
-      const referenceDate = new Date('2025-10-11');
+      const referenceDate = new Date(2025, 9, 11); // October 11, 2025
       const dob = '05/15/1990'; // 35 years old
       expect(calculateAge(dob, referenceDate)).toBe(35);
     });
 
     it('calculates correct age for someone under 18', () => {
-      const referenceDate = new Date('2025-10-11');
+      const referenceDate = new Date(2025, 9, 11); // October 11, 2025
       const dob = '05/15/2010'; // 15 years old
       expect(calculateAge(dob, referenceDate)).toBe(15);
     });
@@ -111,9 +112,11 @@ describe('Date Utility Functions', () => {
 
     it('handles edge case: birthday on leap day', () => {
       const dob = '02/29/2004'; // Leap year birthday
-      const referenceDate = new Date('2023-03-01'); // Non-leap year
+      const referenceDate = new Date(2023, 2, 1); // March 1, 2023 (month is 0-indexed)
       const age = calculateAge(dob, referenceDate);
-      expect(age).toBe(19); // Born Feb 29, 2004, by March 1, 2023 they're 19
+      // Born Feb 29, 2004. In 2023 (non-leap year), their birthday is considered Feb 28.
+      // By March 1, 2023, they've already passed Feb 28, so they're 19.
+      expect(age).toBe(19);
     });
   });
 });
