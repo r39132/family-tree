@@ -1,4 +1,15 @@
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+
+# Python
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 
 # Backend (Python)
 .venv/
@@ -8,10 +19,35 @@ backend/.coverage
 backend/.mypy_cache/
 backend/.ruff_cache/
 backend/.env
+backend/coverage.xml
+backend/htmlcov/
+
+# Test artifacts
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+*.cover
+.hypothesis/
+
+# Debug and temporary files
+debug_*.py
+debug_*.js
+*_debug.py
+temp_*.py
+tmp_*.py
+test_*.py
+!tests/test_*.py
+!backend/tests/test_*.py
+quick_*.py
+simple_*.py
+routes_tree_fixed.py
 
 # Frontend (Node/Next.js)
 frontend/node_modules/
 frontend/.next/
+frontend/build/
+frontend/dist/
 frontend/.turbo/
 frontend/.vercel/
 frontend/.env*
@@ -19,14 +55,31 @@ frontend/.env*
 frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/yarn-error.log*
+frontend/.pnp
+frontend/.pnp.js
 
 # Editors/OS
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# Local assets
+# Project-specific
+# Keep these directories but don't track them
 /screenshots/
 /scripts/
 /bug_analysis/
+
+# One-time migration scripts (keep locally but don't track)
+migrate_*.py
+seed_*.py
+fix_*.py
+cleanup_*.py
+analyze_*.py
+check_*.py
+run_space_tests.py
+
+# Documentation that's work in progress
+INSTAGRAM_INTEGRATION.md
+FAMILY_SPACES_SETUP.md
