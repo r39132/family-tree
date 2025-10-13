@@ -13,10 +13,12 @@ from .routes_user import router as user_router
 # Pre-initialize bcrypt to avoid initialization errors during request handling
 # This works around a passlib/bcrypt issue where internal tests use >72 byte passwords
 try:
-    from .auth_utils import hash_password
+    from .auth_utils import hash_password, verify_password
 
-    # Trigger bcrypt initialization with a short password
-    _ = hash_password("initialization_test")
+    # Trigger bcrypt initialization with both hash and verify operations
+    # The verify operation triggers detect_wrap_bug() which uses >72 byte passwords
+    test_hash = hash_password("initialization_test")
+    _ = verify_password("initialization_test", test_hash)
 except Exception:
     # If initialization fails, log but don't crash
     import logging
