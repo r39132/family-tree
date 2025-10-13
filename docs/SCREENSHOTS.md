@@ -7,13 +7,17 @@
 ![Tree](../frontend/public/screenshots/tree.png)
 
 ## Add Member
-![Add Member](../frontend/public/screenshots/add-member.png)
-
-## Edit Member
-![Edit Member](../frontend/public/screenshots/edit-member.png)
-
-## All Invites
-![All Invites](../frontend/public/screenshots/invites.png)
+![Add Member](../frontend/public/screenshots/add_member.png)
 
 ## Available Invites
-![Available Invites](../frontend/public/screenshots/available-invites.png)
+![Available Invites](../frontend/public/screenshots/invites_available.png)
+
+## Admin
+![Available Invites](../frontend/public/screenshots/admin.png)
+
+
+## Map
+![Available Invites](../frontend/public/screenshots/map.png)
+
+## Events (Birthdays)
+![Available Invites](../frontend/public/screenshots/events_birthdays.png)
