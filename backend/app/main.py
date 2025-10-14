@@ -1,3 +1,7 @@
+# Monkey-patch bcrypt to handle >72 byte passwords
+# This is necessary because passlib's internal detect_wrap_bug() test uses 255-byte passwords
+# which causes ValueError in modern bcrypt versions that enforce the 72-byte limit
+import bcrypt as _bcrypt_module
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -10,20 +14,27 @@ from .routes_spaces import router as spaces_router
 from .routes_tree import router as tree_router
 from .routes_user import router as user_router
 
-# Pre-initialize bcrypt to avoid initialization errors during request handling
-# This works around a passlib/bcrypt issue where internal tests use >72 byte passwords
-try:
-    from .auth_utils import hash_password, verify_password
+_original_hashpw = _bcrypt_module.hashpw
+_original_checkpw = _bcrypt_module.checkpw
 
-    # Trigger bcrypt initialization with both hash and verify operations
-    # The verify operation triggers detect_wrap_bug() which uses >72 byte passwords
-    test_hash = hash_password("initialization_test")
-    _ = verify_password("initialization_test", test_hash)
-except Exception:
-    # If initialization fails, log but don't crash
-    import logging
 
-    logging.warning("Bcrypt initialization warning - may affect password operations")
+def _patched_hashpw(password: bytes, salt: bytes) -> bytes:
+    """Truncate password to 72 bytes before hashing"""
+    if len(password) > 72:
+        password = password[:72]
+    return _original_hashpw(password, salt)
+
+
+def _patched_checkpw(password: bytes, hashed: bytes) -> bool:
+    """Truncate password to 72 bytes before checking"""
+    if len(password) > 72:
+        password = password[:72]
+    return _original_checkpw(password, hashed)
+
+
+# Apply the monkey patch
+_bcrypt_module.hashpw = _patched_hashpw
+_bcrypt_module.checkpw = _patched_checkpw
 
 app = FastAPI(
     title=settings.app_name,
