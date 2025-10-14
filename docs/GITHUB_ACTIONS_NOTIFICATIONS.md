@@ -44,6 +44,7 @@ To get an admin token, you can either:
 **Option B: Generate a token programmatically**
 ```python
 # Run this script to generate an admin token
+# Save as generate_admin_token.py and run: python generate_admin_token.py
 import jwt
 import datetime
 from app.config import Settings
@@ -53,12 +54,15 @@ settings = Settings()
 # Create admin token (adjust username as needed)
 payload = {
     "sub": "admin",  # Your admin username
-    "exp": datetime.datetime.utcnow() + datetime.timedelta(days=365)  # 1 year expiry
+    "exp": datetime.datetime.utcnow() + datetime.timedelta(days=365),  # 1 year expiry
+    "iat": datetime.datetime.utcnow()
 }
 
-token = jwt.encode(payload, settings.jwt_secret_key, algorithm="HS256")
+token = jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_alg)
 print(f"Admin token: {token}")
 ```
+
+**Note**: The Settings field is `jwt_secret`, not `jwt_secret_key`.
 
 ### Step 3: Verify Workflow File
 

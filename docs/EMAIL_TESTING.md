@@ -14,7 +14,7 @@ The email tests cover:
 
 ## Running Tests
 
-### Option 1: Standalone Test Script
+### Option 1: Run Tests via Pytest (Recommended)
 
 ```bash
 # Make sure the backend server is running first
@@ -22,18 +22,11 @@ cd backend
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
 
 # In another terminal, run the comprehensive test
-cd /Users/r39132/Projects/family-tree
-python test_email_functionality.py
-```
-
-### Option 2: Pytest Suite
-
-```bash
 cd backend
 uv run pytest tests/test_email_functionality.py -v
 ```
 
-### Option 3: Manual API Testing
+### Option 2: Manual API Testing
 
 ```bash
 # 1. Create an invite

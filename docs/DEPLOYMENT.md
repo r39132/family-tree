@@ -39,7 +39,7 @@ The setup prevents common issues like:
 ### Setup Commands
 ```bash
 # One-time setup (installs all tools)
-./setup-dev-tools.sh
+./scripts/setup-dev-tools.sh
 
 # Manual pre-commit installation
 pre-commit install
@@ -175,17 +175,17 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-maps-api-key
 ### Quality Assurance Tools
 ```bash
 # Code formatting
-black backend/  # Python formatting
-ruff backend/   # Python linting
-npm run lint --prefix frontend  # TypeScript/React linting
+cd backend && uv run black .           # Python formatting
+cd backend && uv run ruff check        # Python linting
+cd frontend && npm run lint            # TypeScript/React linting
 
 # Type checking
-mypy backend/   # Python type checking
-npm run type-check --prefix frontend  # TypeScript checking
+cd backend && uv run mypy app          # Python type checking
+cd frontend && npm run type-check      # TypeScript checking
 
 # Testing
-pytest backend/ --cov=app  # Backend tests with coverage
-npm test --prefix frontend  # Frontend tests
+cd backend && uv run pytest --cov=app  # Backend tests with coverage
+cd frontend && npm test                # Frontend tests
 ```
 
 ### Database Tools
@@ -229,7 +229,7 @@ pre-commit run --all-files
 
 # Validate configuration files
 python -m json.tool frontend/package.json
-yamllint .github/workflows/ci-cd.yml
+pre-commit run check-yaml --all-files  # Validate YAML syntax
 
 # Test Docker builds locally
 docker build -t test-backend backend/

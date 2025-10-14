@@ -45,7 +45,7 @@ A full‑stack **Family Tree** application with modern web technologies, designe
    ```bash
    GOOGLE_CLOUD_PROJECT=your-project-id
    FIRESTORE_DATABASE=family-tree
-   JWT_SECRET_KEY=your-secret-key
+   JWT_SECRET=your-secret-key
    # Optional: Google Maps integration
    ENABLE_MAP=true
    GOOGLE_MAPS_API_KEY=your-maps-api-key
@@ -60,7 +60,7 @@ A full‑stack **Family Tree** application with modern web technologies, designe
 
 1. **Setup development tools (recommended first step):**
    ```bash
-   ./setup-dev-tools.sh
+   ./scripts/setup-dev-tools.sh
    ```
    This installs pre-commit hooks for:
    - JSON/YAML syntax validation
@@ -143,7 +143,7 @@ The project includes GitHub Actions workflow for automatic deployment to Google 
 
 We welcome contributions! To get started:
 
-1. **Setup development tools:** `./setup-dev-tools.sh`
+1. **Setup development tools:** `./scripts/setup-dev-tools.sh`
 2. **Read the [Contributing Guide](docs/CONTRIBUTING.md)** for detailed workflow and standards
 3. **Check the [Architecture Overview](docs/ARCHITECTURE.md)** to understand the codebase
 

@@ -6,7 +6,7 @@ Thank you for your interest in contributing to the Family Tree project! This gui
 
 ### 1. Install Development Tools
 ```bash
-./setup-dev-tools.sh
+./scripts/setup-dev-tools.sh
 ```
 
 This script installs all necessary development tools including:
@@ -80,14 +80,14 @@ python -m json.tool frontend/package.json  # JSON validation
 ### Code Formatting and Linting
 ```bash
 # Auto-fix issues
-cd frontend && npm run lint:fix  # Fix ESLint issues
-cd backend && uv run ruff --fix  # Fix Python issues
+cd frontend && npm run lint:fix        # Fix ESLint issues
+cd backend && uv run ruff check --fix  # Fix Python issues
 
 # Check without fixing
-cd frontend && npm run lint        # ESLint checks
-cd frontend && npm run type-check  # TypeScript validation
-cd backend && uv run ruff check    # Python linting
-cd backend && uv run black --check .  # Code formatting check
+cd frontend && npm run lint              # ESLint checks
+cd frontend && npm run type-check        # TypeScript validation
+cd backend && uv run ruff check          # Python linting
+cd backend && uv run black --check .     # Code formatting check
 ```
 
 ## Code Standards
@@ -139,10 +139,9 @@ uv run pytest --cov=app --cov-report=html
 # Frontend testing
 cd frontend
 npm test
-npm run test:watch  # Watch mode for development
 
-# End-to-end testing (if configured)
-npm run test:e2e
+# Watch mode for development (if available)
+# npm run test:watch
 ```
 
 ### Local Development
