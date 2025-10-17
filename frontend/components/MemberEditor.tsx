@@ -48,6 +48,7 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
       normalize(m.residence_location) !== normalize(member.residence_location) ||
       normalize(m.email) !== normalize(member.email) ||
       normalize(m.phone) !== normalize(member.phone) ||
+      normalize(m.profile_picture_url) !== normalize(member.profile_picture_url) ||
       !!m.is_deceased !== !!member.is_deceased ||
       JSON.stringify(currentHobbies.sort()) !== JSON.stringify(originalHobbies.sort())
     );
@@ -239,6 +240,7 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
     </label>
   <label>Email<input className="input" type="email" placeholder="Email" value={m.email||''} onChange={e=>ch('email',e.target.value)}/>{errors.email && <span className="error">{errors.email}</span>}</label>
     <label>Phone<input className="input" placeholder="Phone" value={m.phone||''} onChange={e=>ch('phone',e.target.value)}/></label>
+  <label>Profile Picture URL<input className="input" placeholder="https://example.com/photo.jpg" value={m.profile_picture_url||''} onChange={e=>ch('profile_picture_url',e.target.value)}/></label>
   <label>Hobbies (comma-separated)
     <input
       className="input"

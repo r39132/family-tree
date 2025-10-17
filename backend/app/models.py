@@ -53,6 +53,7 @@ class Member(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     hobbies: List[str] = Field(default_factory=list)
+    profile_picture_url: Optional[str] = None
 
     @field_validator("first_name")
     @classmethod
@@ -85,6 +86,7 @@ class Member(BaseModel):
         "birth_location",
         "residence_location",
         "phone",
+        "profile_picture_url",
         mode="before",
     )
     @classmethod
@@ -109,6 +111,7 @@ class CreateMember(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     hobbies: List[str] = Field(default_factory=list)
+    profile_picture_url: Optional[str] = None
 
     @field_validator("first_name")
     @classmethod
@@ -172,6 +175,7 @@ class CreateMember(BaseModel):
         "birth_location",
         "residence_location",
         "phone",
+        "profile_picture_url",
         mode="before",
     )
     @classmethod
@@ -217,6 +221,7 @@ class UpdateMember(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     hobbies: Optional[List[str]] = None
+    profile_picture_url: Optional[str] = None
 
     @field_validator("dob", "date_of_death")
     @classmethod
