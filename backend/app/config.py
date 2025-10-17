@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     google_maps_api_key: str = Field(default="", alias="GOOGLE_MAPS_API_KEY")
     frontend_url: str = Field(default="http://localhost:3000", alias="FRONTEND_URL")
 
+    # Cloud Storage for profile pictures
+    gcs_bucket_name: str = Field(default="", alias="GCS_BUCKET_NAME")
+    max_upload_size_mb: int = Field(default=5, alias="MAX_UPLOAD_SIZE_MB")
+
     class Config:
         env_file = ".env"
         extra = "ignore"

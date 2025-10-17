@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from google.api_core.exceptions import AlreadyExists
 
+from .config import settings
 from .deps import get_current_username
 from .firestore_client import get_db
 from .models import (
@@ -17,6 +18,7 @@ from .models import (
     TreeVersionInfo,
     UpdateMember,
 )
+from .storage import delete_profile_picture, upload_profile_picture
 from .utils.time import to_iso_string, utc_now
 
 
@@ -727,6 +729,85 @@ def delete_member(member_id: str, request: Request, username: str = Depends(get_
     # Delete the member
     db.collection("members").document(member_id).delete()
     return {"ok": True}
+
+
+@router.post("/members/{member_id}/picture")
+async def upload_member_picture(
+    member_id: str,
+    file: UploadFile = File(...),
+    request: Request = None,
+    username: str = Depends(get_current_username),
+):
+    """
+    Upload a profile picture for a member.
+
+    - Validates file type (JPEG, PNG, WebP)
+    - Validates file size (max configured MB)
+    - Optimizes and resizes image
+    - Uploads to Google Cloud Storage
+    - Updates member's profile_picture_url
+    - Deletes old picture if it exists
+    """
+    _ensure_auth_header(request)
+    db = get_db()
+
+    # Check if GCS is configured
+    if not settings.gcs_bucket_name:
+        raise HTTPException(
+            status_code=501,
+            detail="Image upload is not configured. Please set GCS_BUCKET_NAME environment variable.",
+        )
+
+    # Get member and verify access
+    member_ref = db.collection("members").document(member_id)
+    member_doc = member_ref.get()
+    if not member_doc.exists:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    member_data = member_doc.to_dict()
+    space_id = member_data.get("space_id")
+
+    # Verify user has access to this space
+    user_space_id = _get_user_space(username)
+    if space_id != user_space_id:
+        raise HTTPException(status_code=403, detail="You do not have access to this member")
+
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/webp"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type. Allowed types: {', '.join(allowed_types)}",
+        )
+
+    # Read file content
+    file_content = await file.read()
+
+    # Validate file size
+    max_size_bytes = settings.max_upload_size_mb * 1024 * 1024
+    if len(file_content) > max_size_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Maximum size: {settings.max_upload_size_mb}MB",
+        )
+
+    # Upload to Cloud Storage
+    public_url = upload_profile_picture(file_content, file.content_type, member_id)
+
+    if not public_url:
+        raise HTTPException(
+            status_code=500, detail="Failed to upload image. Please try again later."
+        )
+
+    # Delete old picture if it exists
+    old_picture_url = member_data.get("profile_picture_url")
+    if old_picture_url and settings.gcs_bucket_name in old_picture_url:
+        delete_profile_picture(old_picture_url)
+
+    # Update member with new picture URL
+    member_ref.update({"profile_picture_url": public_url})
+
+    return {"profile_picture_url": public_url, "message": "Profile picture uploaded successfully"}
 
 
 @router.post("/members/{member_id}/spouse")
