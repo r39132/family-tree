@@ -19,6 +19,9 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
     // Initialize hobbies input as a comma-separated string
     return Array.isArray(member.hobbies) ? member.hobbies.join(', ') : '';
   });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(member.profile_picture_url || null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const router = useRouter();
 
   function parseHobbies(input: string): string[] {
@@ -48,6 +51,7 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
       normalize(m.residence_location) !== normalize(member.residence_location) ||
       normalize(m.email) !== normalize(member.email) ||
       normalize(m.phone) !== normalize(member.phone) ||
+      normalize(m.profile_picture_url) !== normalize(member.profile_picture_url) ||
       !!m.is_deceased !== !!member.is_deceased ||
       JSON.stringify(currentHobbies.sort()) !== JSON.stringify(originalHobbies.sort())
     );
@@ -61,6 +65,75 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
   }, [m, hobbiesInput, onChangesDetected]);
 
   function ch(k:string,v:any){ setM((p:any)=>({...p,[k]:v})); }
+
+  // Handle file selection
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please select a valid image file (JPEG, PNG, or WebP)');
+      return;
+    }
+
+    // Validate file size (5MB max)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert('File size must be less than 5MB');
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // Create preview URL
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreviewUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // Handle image upload
+  async function handleUploadImage() {
+    if (!selectedFile || !member.id) return;
+
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080'}/tree/members/${member.id}/picture`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to upload image');
+      }
+
+      const data = await response.json();
+
+      // Update member with new picture URL
+      ch('profile_picture_url', data.profile_picture_url);
+      setPreviewUrl(data.profile_picture_url);
+      setSelectedFile(null);
+
+      alert('Profile picture uploaded successfully!');
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      alert(error.message || 'Failed to upload image. Please try again.');
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
   const nameRe = useMemo(()=>/^[A-Za-z-]+$/,[]);
   const dobRe = useMemo(()=>/^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/ ,[]);
   const emailRe = useMemo(()=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/,[]);
@@ -239,6 +312,55 @@ export default function MemberEditor({member, onSave, requireBasics=false, hideS
     </label>
   <label>Email<input className="input" type="email" placeholder="Email" value={m.email||''} onChange={e=>ch('email',e.target.value)}/>{errors.email && <span className="error">{errors.email}</span>}</label>
     <label>Phone<input className="input" placeholder="Phone" value={m.phone||''} onChange={e=>ch('phone',e.target.value)}/></label>
+
+  <label>
+    Profile Picture
+    <div style={{ marginTop: '8px' }}>
+      {previewUrl && (
+        <div style={{ marginBottom: '12px' }}>
+          <img
+            src={previewUrl}
+            alt="Profile preview"
+            style={{
+              width: '100px',
+              height: '100px',
+              borderRadius: '50%',
+              objectFit: 'cover',
+              border: '2px solid #ccc'
+            }}
+          />
+        </div>
+      )}
+      <input
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        onChange={handleFileSelect}
+        style={{ marginBottom: '8px' }}
+      />
+      {selectedFile && member.id && (
+        <div>
+          <button
+            type="button"
+            onClick={handleUploadImage}
+            disabled={uploadingImage}
+            className="btn"
+            style={{ marginTop: '8px' }}
+          >
+            {uploadingImage ? 'Uploading...' : 'Upload Image'}
+          </button>
+          <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+            Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+          </div>
+        </div>
+      )}
+      {!member.id && (
+        <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+          Save the member first, then you can upload a profile picture.
+        </div>
+      )}
+    </div>
+  </label>
+
   <label>Hobbies (comma-separated)
     <input
       className="input"

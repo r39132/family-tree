@@ -8,6 +8,7 @@ import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { isEligibleForMarriage } from '../lib/dateUtils';
+import ProfilePicture from '../components/ProfilePicture';
 
 export default function Home(){
   const [tree,setTree]=useState<any>({roots:[],members:[]});
@@ -204,13 +205,29 @@ export default function Home(){
         {treeView === 'cards' ? (
           <>
             <div className="card-header">
-              <div style={{ marginBottom: '4px' }}>
-                <div>{nameEl(m)} <span className="small">{dobText(m)}</span></div>
+              <div style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ProfilePicture
+                  firstName={m.first_name}
+                  lastName={m.last_name}
+                  profilePictureUrl={m.profile_picture_url}
+                  size={40}
+                />
+                <div style={{ flex: 1 }}>
+                  <div>{nameEl(m)} <span className="small">{dobText(m)}</span></div>
+                </div>
               </div>
               {s && (
-                <div>
-                  <div>
-                    <span style={{opacity:0.6}}>&amp;</span> {nameEl(s)} <span className="small">{dobText(s)}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ProfilePicture
+                    firstName={s.first_name}
+                    lastName={s.last_name}
+                    profilePictureUrl={s.profile_picture_url}
+                    size={40}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div>
+                      <span style={{opacity:0.6}}>&amp;</span> {nameEl(s)} <span className="small">{dobText(s)}</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -218,13 +235,33 @@ export default function Home(){
           </>
         ) : (
           <>
-            {nameEl(m)}{' '}<span className="small">{dobText(m)}</span>
-            {s && (
-              <>
-                {' '}<span style={{opacity:0.6}}>&amp;</span>{' '}
-                {nameEl(s)}{' '}<span className="small">{dobText(s)}</span>
-              </>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {treeView === 'standard' && (
+                <ProfilePicture
+                  firstName={m.first_name}
+                  lastName={m.last_name}
+                  profilePictureUrl={m.profile_picture_url}
+                  size={32}
+                />
+              )}
+              <div style={{ flex: 1 }}>
+                {nameEl(m)}{' '}<span className="small">{dobText(m)}</span>
+                {s && (
+                  <>
+                    {' '}<span style={{opacity:0.6}}>&amp;</span>{' '}
+                    {treeView === 'standard' && (
+                      <ProfilePicture
+                        firstName={s.first_name}
+                        lastName={s.last_name}
+                        profilePictureUrl={s.profile_picture_url}
+                        size={32}
+                      />
+                    )}
+                    {' '}{nameEl(s)}{' '}<span className="small">{dobText(s)}</span>
+                  </>
+                )}
+              </div>
+            </div>
             {treeView !== 'horizontal' && (
               <div className="nav" style={{gap: treeView === 'minimal' ? 4 : 8}}>
                 <button className={`btn secondary ${buttonClass}`} title={`View ${m.first_name}`} onClick={()=>router.push(`/view/${m.id}`)}><View /></button>

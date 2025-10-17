@@ -36,6 +36,10 @@ GOOGLE_CLOUD_PROJECT=your-project-id
 FIRESTORE_DATABASE=your-database-name
 JWT_SECRET=your-unique-secret-key-min-32-chars
 
+# Cloud Storage for profile pictures
+GCS_BUCKET_NAME=your-project-id-profile-pictures
+MAX_UPLOAD_SIZE_MB=5  # Optional, defaults to 5MB
+
 # Optional: Google Maps integration
 ENABLE_MAP=true
 GOOGLE_MAPS_API_KEY=your-maps-api-key
@@ -114,6 +118,29 @@ The script will output:
 - Instructions for GitHub secrets configuration
 
 **Save this output!** You'll need it for Step 7.
+
+### Create Cloud Storage Bucket (for Profile Pictures)
+
+```bash
+# Create a GCS bucket for storing profile pictures
+gsutil mb -p your-project-id -l us-central1 gs://your-project-id-profile-pictures
+
+# Enable uniform bucket-level access (modern IAM approach)
+gsutil uniformbucketlevelaccess set on gs://your-project-id-profile-pictures
+
+# Grant service account storage permissions (replace with your service account email)
+gsutil iam ch serviceAccount:family-tree-runtime@your-project-id.iam.gserviceaccount.com:objectAdmin gs://your-project-id-profile-pictures
+```
+
+**Recommended bucket name:** `{your-project-id}-profile-pictures`
+**Example:** `family-tree-469815-profile-pictures`
+
+**Security Note:**
+- ⚠️ **No public access** - Bucket remains private
+- ✅ **Signed URLs** - Images accessed via time-limited signed URLs (7 days)
+- ✅ **Service account only** - Only your runtime service account has access
+
+**Note:** This bucket name should match the `GCS_BUCKET_NAME` value in your `backend/.env` file.
 
 ## Step 4: Initialize Firestore Database
 
@@ -355,6 +382,8 @@ chmod +x backend/scripts/*.sh
 **Solution:** Ensure these environment variables are set in `backend/.env`:
 - `GOOGLE_CLOUD_PROJECT`
 - `FIRESTORE_DATABASE`
+- `GCS_BUCKET_NAME` (optional, for profile picture uploads)
+- `MAX_UPLOAD_SIZE_MB` (optional, defaults to 5MB)
 
 And authenticate with: `gcloud auth application-default login`
 

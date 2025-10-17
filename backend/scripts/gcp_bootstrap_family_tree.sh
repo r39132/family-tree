@@ -9,6 +9,7 @@ DEPLOYER_SA_NAME="${4:-family-tree-deployer}"
 RUNTIME_SA_NAME="${5:-family-tree-runtime}"
 MAKE_DEPLOYER_KEY="${6:-true}"
 KEY_OUTPUT_PATH="${HOME}/${DEPLOYER_SA_NAME}.json"
+GCS_BUCKET_NAME="${PROJECT_ID}-profile-pictures"
 
 # Show usage if --help is provided
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
@@ -16,6 +17,13 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
 Usage: $0 [PROJECT_ID] [REGION] [GAR_LOCATION] [DEPLOYER_SA_NAME] [RUNTIME_SA_NAME] [MAKE_DEPLOYER_KEY]
 
 GCP Bootstrap Script for Family Tree Application
+
+This script sets up:
+- Required GCP APIs (Cloud Run, Artifact Registry, Cloud Storage)
+- Service accounts for deployment and runtime
+- IAM bindings and permissions
+- GCS bucket for profile pictures with private access (signed URLs)
+- Uniform bucket-level access for modern IAM
 
 Arguments (all optional, defaults shown):
   PROJECT_ID           GCP project ID (default: family-tree-469815)
@@ -39,8 +47,13 @@ Examples:
   $0 my-project us-west1 us-west1 my-deployer my-runtime true
 
 Environment:
-  Requires: gcloud CLI, jq
+  Requires: gcloud CLI, gsutil, jq
   Permissions: Project Owner or equivalent to create service accounts and set IAM policies
+
+GCS Bucket:
+  Bucket name will be: \${PROJECT_ID}-profile-pictures
+  Location: Same as REGION parameter
+  Access: Private (runtime SA has objectAdmin, uses signed URLs for secure access)
 
 EOF
   exit 0
@@ -146,6 +159,7 @@ main() {
   enable_api serviceusage.googleapis.com
   enable_api run.googleapis.com
   enable_api artifactregistry.googleapis.com
+  enable_api storage.googleapis.com
   ok "Required APIs enabled"
 
   # 2) Service Accounts
@@ -167,7 +181,32 @@ main() {
 
   ok "IAM bindings applied"
 
-  # 5) (Optional) Create deployer key for GitHub Actions
+  # 5) Create GCS bucket for profile pictures
+  note "Setting up GCS bucket for profile pictures: ${GCS_BUCKET_NAME}"
+
+  # Check if bucket exists
+  if gsutil ls -b "gs://${GCS_BUCKET_NAME}" >/dev/null 2>&1; then
+    note "Bucket already exists: gs://${GCS_BUCKET_NAME}"
+  else
+    note "Creating bucket: gs://${GCS_BUCKET_NAME}"
+    gsutil mb -p "${PROJECT_ID}" -l "${REGION}" "gs://${GCS_BUCKET_NAME}"
+    ok "Bucket created: gs://${GCS_BUCKET_NAME}"
+  fi
+
+  # Enable uniform bucket-level access (modern IAM approach)
+  note "Enabling uniform bucket-level access"
+  gsutil uniformbucketlevelaccess set on "gs://${GCS_BUCKET_NAME}" 2>/dev/null || true
+
+  # Grant runtime service account storage permissions
+  note "Granting runtime SA storage permissions"
+  gsutil iam ch "serviceAccount:${RUNTIME_SA_EMAIL}:objectAdmin" "gs://${GCS_BUCKET_NAME}"
+
+  # Grant service usage permissions to runtime SA (required for quota checks)
+  bind_role "serviceAccount:${RUNTIME_SA_EMAIL}" "roles/serviceusage.serviceUsageConsumer"
+
+  ok "GCS bucket configured for profile pictures (private access only)"
+
+  # 6) (Optional) Create deployer key for GitHub Actions
   maybe_make_key "$DEPLOYER_SA_EMAIL" "$KEY_OUTPUT_PATH"
 
   bold "Done."
@@ -182,14 +221,18 @@ main() {
    - Create secret  CLOUD_RUN_SERVICE       = family-tree-api
    - (Optional) CLOUD_RUN_RUNTIME_SA        = ${RUNTIME_SA_EMAIL}
 
-2) In your deploy step, specify the runtime SA:
+2) Update your .env file with the GCS bucket name:
+   GCS_BUCKET_NAME=${GCS_BUCKET_NAME}
+   MAX_UPLOAD_SIZE_MB=5
+
+3) In your deploy step, specify the runtime SA and GCS bucket:
    gcloud run deploy \${{ secrets.CLOUD_RUN_SERVICE }} \\
      --image "\$IMAGE" \\
      --region \${{ secrets.CLOUD_RUN_REGION }} \\
      --platform managed \\
      --service-account ${RUNTIME_SA_EMAIL} \\
      --allow-unauthenticated \\
-     --set-env-vars "GOOGLE_CLOUD_PROJECT=\${{ secrets.GCP_PROJECT_ID }},FIRESTORE_DATABASE=family-tree"
+     --set-env-vars "GOOGLE_CLOUD_PROJECT=\${{ secrets.GCP_PROJECT_ID }},FIRESTORE_DATABASE=family-tree,GCS_BUCKET_NAME=${GCS_BUCKET_NAME},MAX_UPLOAD_SIZE_MB=5"
 
 3) If you prefer uploading the key with GitHub CLI:
    base64 -w0 "${KEY_OUTPUT_PATH}" | gh secret set GCP_SA_KEY

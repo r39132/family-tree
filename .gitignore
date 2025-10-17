@@ -3,56 +3,6 @@
 .AppleDouble
 .LSOverride
 
-# Python
-*.pyc
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-.venv/
-
-# Backend (Python)
-backend/.pytest_cache/
-backend/.mypy_cache/
-backend/.ruff_cache/
-backend/.env
-backend/htmlcov/
-
-# Test artifacts
-htmlcov/
-.pytest_cache/
-*.cover
-.hypothesis/
-
-# Debug and temporary files
-debug_*.py
-debug_*.js
-*_debug.py
-temp_*.py
-tmp_*.py
-test_*.py
-!tests/test_*.py
-!backend/tests/test_*.py
-quick_*.py
-simple_*.py
-routes_tree_fixed.py
-
-# Frontend (Node/Next.js)
-frontend/node_modules/
-frontend/.next/
-frontend/build/
-frontend/dist/
-frontend/.turbo/
-frontend/.vercel/
-frontend/.env*
-!frontend/.env*.example
-frontend/npm-debug.log*
-frontend/yarn-debug.log*
-frontend/yarn-error.log*
-frontend/.pnp
-frontend/.pnp.js
-
 # Editors/IDEs
 .vscode/
 .idea/
@@ -64,4 +14,4 @@ frontend/.pnp.js
 /screenshots/
 /bug_analysis/
 /private_docs/
-/ingest/ingest_files/
+/ingest/

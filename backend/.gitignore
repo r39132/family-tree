@@ -1,13 +1,30 @@
-.venv/
+# Python
+*.pyc
+*.py[cod]
+*$py.class
+*.so
 __pycache__/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+
+# Testing
 .pytest_cache/
 .coverage
+htmlcov/
+*.cover
+.hypothesis/
+
+# Linting and type checking
 .mypy_cache/
 .ruff_cache/
+
+# Environment and configuration
 .env
 uv.lock
-*.pyc
-scripts/
-# Sample/test JSON files - exclude from git
+
+# Sample/test JSON files
 *.json
 !family.schema.json

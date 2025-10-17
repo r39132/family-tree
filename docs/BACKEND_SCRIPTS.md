@@ -1,25 +1,113 @@
 # Backend Scripts Documentation
 
-This document provides comprehensive documentation for the utility scripts in `backend/scripts/`. These scripts are maintained for development, testing, and deployment purposes.
+Comprehensive documentation for utility scripts in `backend/scripts/`. These scripts handle development, testing, and deployment tasks.
 
-**Last Updated:** October 16, 2025
+**Last Updated:** October 17, 2025
+
+---
+
+## Quick Reference
+
+| Script | Category | Purpose | When to Use |
+|--------|----------|---------|-------------|
+| `gcp_bootstrap_family_tree.sh` | 🚀 Deploy | Set up GCP infrastructure | ✅ Required for production |
+| `initialize_collections.py` | 📦 Setup | Create Firestore collections | ✅ Required (first setup) |
+| `seed_admin.py` | 👤 Setup | Create admin account | ✅ Required |
+| `populate_dummy_data.py` | 🧪 Testing | Create test family tree data | ⚠️ Optional (development) |
+| `create_user_account.py` | 👥 Utility | Create user accounts | ⚠️ Optional (multi-user) |
 
 ---
 
 ## Table of Contents
 
-1. [Seed Scripts](#seed-scripts) - Initialize data for development/testing
-2. [Utility Scripts](#utility-scripts) - Database operations and account management
-3. [Deployment Scripts](#deployment-scripts) - GCP infrastructure setup
-4. [For New Users](#for-new-users) - Setup guide for forked deployments
+1. [Quick Start](#quick-start) - Essential setup for new deployments
+2. [Setup Scripts](#setup-scripts) - Required initialization scripts
+3. [Testing & Development](#testing--development) - Optional test data scripts
+4. [Utility Scripts](#utility-scripts) - Account and database management
+5. [Deployment Scripts](#deployment-scripts) - GCP infrastructure automation
+6. [Workflow Examples](#workflow-examples) - Common usage patterns
+7. [Troubleshooting](#troubleshooting) - Common issues and solutions
 
 ---
 
-## Seed Scripts
+## Quick Start
 
-These scripts populate the database with initial data for development and testing.
+**For new deployments, run these scripts in order:**
+
+```bash
+# 1. Set up GCP infrastructure (production only)
+./backend/scripts/gcp_bootstrap_family_tree.sh your-project-id
+
+# 2. Initialize database collections
+cd backend
+uv run python scripts/initialize_collections.py
+
+# 3. Create your admin account
+uv run python scripts/seed_admin.py \
+  --username admin \
+  --email admin@yourcompany.com \
+  --password SecurePass123
+
+# 4. (Optional) Add test data for development
+uv run python scripts/populate_dummy_data.py
+```
+
+---
+
+## Setup Scripts
+
+Essential scripts for initializing a new deployment.
+
+---
+
+### `initialize_collections.py`
+
+**Category:** Setup
+**Required:** ✅ Yes (first-time setup)
+
+**Purpose:** Creates all required Firestore collections with placeholder documents.
+
+**Usage:**
+```bash
+# Initialize collections
+uv run python scripts/initialize_collections.py
+
+# Initialize and cleanup placeholders
+uv run python scripts/initialize_collections.py --cleanup
+```
+
+**What it does:**
+1. Creates 7 essential Firestore collections:
+   - `users`: User authentication data
+   - `members`: Family tree member data
+   - `relations`: Parent-child relationships
+   - `member_keys`: Deleted member tracking (unique name constraint)
+   - `tree_versions`: Saved tree snapshots
+   - `tree_state`: Active version tracking per user
+   - `invites`: User invitation system
+2. Each collection gets a `_placeholder` document to ensure it exists
+3. Optional cleanup removes placeholder documents
+
+**Parameters:**
+- `--cleanup`: Remove placeholder documents after initialization
+
+**Safety Notes:**
+- ✅ Safe to run multiple times (idempotent)
+- ✅ Creates collections if they don't exist
+- ✅ Placeholder documents marked with `is_placeholder: true`
+- Placeholders are automatically ignored by application logic
+
+**Use Cases:**
+- First-time database setup
+- Recreating collections after reset
+- Ensuring all required collections exist
+
+---
 
 ### `seed_admin.py`
+
+**Category:** Setup
+**Required:** ✅ Yes
 
 **Purpose:** Creates or promotes a user account with admin privileges.
 
@@ -61,7 +149,16 @@ uv run python scripts/seed_admin.py \
 
 ---
 
+## Testing & Development
+
+Optional scripts for creating test data and development environments.
+
+---
+
 ### `populate_dummy_data.py`
+
+**Category:** Testing
+**Required:** ⚠️ Optional (development/testing only)
 
 **Purpose:** Creates comprehensive test data with a multi-generation family tree for testing and development.
 
@@ -133,9 +230,14 @@ Grandchildren:
 
 ## Utility Scripts
 
-These scripts perform database operations and account management.
+Scripts for ongoing database operations and account management.
+
+---
 
 ### `create_user_account.py`
+
+**Category:** Utility
+**Required:** ⚠️ Optional (multi-user setups)
 
 **Purpose:** Creates user accounts and optionally transfers dummy data to new users.
 
@@ -184,59 +286,16 @@ uv run python scripts/create_user_account.py --username janedoe --email jane@exa
 
 ---
 
-### `initialize_collections.py`
+## Deployment Scripts
 
-**Purpose:** Creates all required Firestore collections with placeholder documents.
-
-**Usage:**
-```bash
-# Initialize collections
-uv run python scripts/initialize_collections.py
-
-# Initialize and cleanup placeholders
-uv run python scripts/initialize_collections.py --cleanup
-```
-
-**What it does:**
-1. Creates 7 essential Firestore collections:
-   - `users`: User authentication data
-   - `members`: Family tree member data
-   - `relations`: Parent-child relationships
-   - `member_keys`: Deleted member tracking (unique name constraint)
-   - `tree_versions`: Saved tree snapshots
-   - `tree_state`: Active version tracking per user
-   - `invites`: User invitation system
-2. Each collection gets a `_placeholder` document to ensure it exists
-3. Optional cleanup removes placeholder documents
-
-**Parameters:**
-- `--cleanup`: Remove placeholder documents after initialization
-
-**Safety Notes:**
-- ✅ Safe to run multiple times (idempotent)
-- ✅ Creates collections if they don't exist
-- ✅ Placeholder documents marked with `is_placeholder: true`
-- Placeholders are automatically ignored by application logic
-
-**Use Cases:**
-- First-time database setup
-- Recreating collections after reset
-- Ensuring all required collections exist
-
-**Dependencies:**
-- `app.firestore_client.get_db()`
-
-**Output:**
-- All 7 required collections created and ready for use
-- Placeholder documents can be cleaned up with `--cleanup`
+Automation scripts for GCP infrastructure setup and deployment.
 
 ---
 
-## Deployment Scripts
-
-These scripts handle GCP infrastructure setup and configuration.
-
 ### `gcp_bootstrap_family_tree.sh`
+
+**Category:** Deployment
+**Required:** ✅ Yes (for production deployment)
 
 **Purpose:** Automates GCP project setup for deploying Family Tree app to Cloud Run.
 
@@ -345,22 +404,6 @@ gh secret set CLOUD_RUN_RUNTIME_SA -b 'family-tree-runtime@family-tree-469815.ia
 
 ---
 
-## For New Users
-
-If you're forking this project to deploy your own Family Tree application, see the [README Quick Setup Guide](../README.md#-setting-up-a-forked-deployment) for a complete step-by-step walkthrough.
-
-**TL;DR - Essential Scripts for Forked Deployment:**
-
-| Script | Purpose | Required? |
-|--------|---------|-----------|
-| `gcp_bootstrap_family_tree.sh` | Set up GCP infrastructure | ✅ Yes (production) |
-| `initialize_collections.py` | Create Firestore collections | ✅ Yes |
-| `seed_admin.py` | Create admin account | ✅ Yes |
-| `populate_dummy_data.py` | Add test/demo data | ⚠️ Optional |
-| `create_user_account.py` | Create additional users | ⚠️ Optional |
-
----
-
 ## Workflow Examples
 
 ### Fresh Development Setup
@@ -437,42 +480,9 @@ gh secret set GCP_PROJECT_ID -b 'my-family-tree-project'
 
 ---
 
-## Removed Scripts
+## Troubleshooting
 
-The following scripts have been removed as they were either one-time operations that have been executed, or too project-specific. They are preserved in git history if needed for reference:
-
-### Migrations (7 scripts)
-- `migrate_invites_active_to_status.py`
-- `migrate_timezone_aware.py`
-- `migrate_to_global_tree.py`
-- `scripts_migrate_dob_format.py`
-- `backfill_tree_versions.py`
-- `scripts_backfill_dob_ts.py`
-- `scripts_titlecase_members.py`
-
-### Fixes (2 scripts)
-- `fix_broken_tree.py`
-- `fix_tree_structure.py`
-
-### Cleanup (1 script)
-- `cleanup_placeholders.py`
-
-### Debug/Analysis (4 scripts)
-- `analyze_tree_structure.py`
-- `check_data_format.py`
-- `debug_member_count.py`
-- `debug_tree_logic.py`
-
-### Project-Specific (3 scripts) - Removed October 16, 2025
-- `scripts_seed_roots.py` - Hardcoded root members ("Achan", "Nanan")
-- `add_marriage.py` - Hardcoded marriage (Robert & Margaret Johnson)
-- `reset_database.py` - Dangerous script (deletes all data)
-
-**Note:** These removed scripts can be found in git history prior to their removal dates.
-
----
-
-## Common Issues & Solutions
+Common issues and their solutions.
 
 ### "Permission denied" on shell scripts
 **Solution:** Make scripts executable:
@@ -486,9 +496,7 @@ chmod +x backend/scripts/*.sh
 ### "Could not find test user" when using `create_user_account.py`
 **Solution:** Run `populate_dummy_data.py` first to create the test user, or use `--no-transfer` flag.
 
-### "Could not find Robert and Margaret Johnson"
-**Cause:** This refers to a removed script (`add_marriage.py`)
-**Solution:** The marriage relationship is now automatically created by `populate_dummy_data.py`.
+
 
 ### "User already exists"
 **Script:** `create_user_account.py` or `seed_admin.py`
@@ -509,56 +517,69 @@ chmod +x backend/scripts/*.sh
 
 ### Adding New Scripts
 
+When creating new scripts, follow these guidelines:
+
 1. **Location:** Place in `backend/scripts/`
-2. **Arguments:** Use `argparse` with sensible defaults for configurability
+2. **Shebang:** Use `#!/usr/bin/env python3` for Python scripts
 3. **Imports:** Add path modification for app imports:
    ```python
    import sys
    import os
    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
    ```
-3. **Shebang:** Use `#!/usr/bin/env python3` for executability
 4. **Arguments:** Use `argparse` with sensible defaults - avoid hardcoding values
-5. **Documentation:** Add docstring explaining purpose and usage
-6. **Safety:** Add appropriate warnings for destructive operations
-7. **Idempotency:** Make scripts safe to run multiple times when possible
-8. **Update this doc:** Add entry in appropriate section
+5. **Documentation:**
+   - Add comprehensive docstring explaining purpose and usage
+   - Include examples in docstring
+   - Update this documentation file
+6. **Safety:**
+   - Add appropriate warnings for destructive operations
+   - Make scripts idempotent when possible
+   - Confirm before destructive actions
+7. **Categories:**
+   - **Setup:** Required initialization (keep)
+   - **Testing:** Development/test data (keep)
+   - **Utility:** Ongoing operations (keep)
+   - **Deployment:** Infrastructure automation (keep)
+   - **Migration:** One-time transformations (remove after use)
+   - **Debug:** Temporary analysis (remove after issue resolved)
 
-### Script Categories
+### Script Maintenance
 
-- **Seed:** Initialize/populate data for testing (reusable, with configurable parameters)
-- **Utility:** Database operations, account management (reusable)
-- **Deployment:** Infrastructure setup (reusable with arguments)
-- **Migration:** One-time data transformations (remove after execution)
-- **Fix:** One-time repairs (remove after execution)
-- **Debug:** Analysis tools (remove after issue resolved)
-- **Project-Specific:** Hardcoded for specific data (remove before open-sourcing)
+**Keep scripts that are:**
+- Reusable with different configurations
+- Required for setup/deployment
+- Useful for development/testing
+- Well-documented with clear parameters
 
-### Cleanup Policy
+**Remove scripts that are:**
+- One-time operations (migrations, fixes)
+- Hardcoded with project-specific data
+- Superseded by better alternatives
+- No longer relevant to the project
 
-Scripts that should be removed:
-1. One-time operations (migrations, fixes) - after execution and verification
-2. Project-specific scripts with hardcoded personal data
-3. Dangerous scripts (like `reset_database.py`) unless needed for development
+---
 
-When removing:
-1. Document in git history
-2. List in "Removed Scripts" section with reason
-3. Note date of removal
+## Additional Resources
+
+- **Deployment Guide:** See [FORKED_DEPLOYMENT.md](FORKED_DEPLOYMENT.md) for complete setup walkthrough
+- **Profile Pictures:** See [PROFILE_PICTURES.md](PROFILE_PICTURES.md) for GCS bucket setup
+- **Project README:** See [README.md](../README.md) for general documentation
+- **Git History:** Check git history for previous scripts and migrations
 
 ---
 
 ## Questions or Issues?
 
-If you encounter issues with any script or need to add new functionality:
-1. Check this documentation first
-2. Review the script's source code and comments
-3. Check git history for removed scripts if needed
-4. See the [README Setup Guide](../README.md#-setting-up-a-forked-deployment) for deployment instructions
-5. Create a GitHub issue with details
+If you encounter issues with any script:
+1. ✅ Check this documentation first
+2. ✅ Review the script's source code and inline comments
+3. ✅ Check the relevant guides (FORKED_DEPLOYMENT.md, etc.)
+4. ✅ Search git history if referencing old functionality
+5. ✅ Create a GitHub issue with detailed information
 
 ---
 
-**Last Updated:** October 16, 2025
-**Scripts Documented:** 5 (1 seed, 2 utility, 1 deployment, 1 optional test data)
-**Removed Scripts:** 17 (14 one-time operations + 3 project-specific, preserved in git history)
+**Last Updated:** October 17, 2025
+**Active Scripts:** 5 (2 setup, 1 testing, 1 utility, 1 deployment)
+**Maintained by:** Project contributors
