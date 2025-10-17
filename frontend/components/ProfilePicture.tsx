@@ -32,8 +32,14 @@ export default function ProfilePicture({
 
   const backgroundColor = getColorFromName(`${firstName}${lastName}`);
 
-  // Show initials if no URL, URL is invalid, or image failed to load
-  const showInitials = !profilePictureUrl || imageError;
+  // Only show the profile picture if a valid URL exists
+  // Don't show anything (no colored bubble/initials) if no profile picture
+  const hasValidImage = profilePictureUrl && !imageError;
+
+  // If no valid image, return null (don't render anything)
+  if (!hasValidImage) {
+    return null;
+  }
 
   return (
     <div
@@ -46,27 +52,20 @@ export default function ProfilePicture({
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: showInitials ? backgroundColor : 'transparent',
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: size * 0.4,
+        backgroundColor: 'transparent',
         flexShrink: 0,
       }}
     >
-      {showInitials ? (
-        initials
-      ) : (
-        <img
-          src={profilePictureUrl}
-          alt={`${firstName} ${lastName}`}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-          }}
-          onError={() => setImageError(true)}
-        />
-      )}
+      <img
+        src={profilePictureUrl}
+        alt={`${firstName} ${lastName}`}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+        }}
+        onError={() => setImageError(true)}
+      />
     </div>
   );
 }
