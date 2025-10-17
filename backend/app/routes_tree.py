@@ -7,6 +7,8 @@ from google.api_core.exceptions import AlreadyExists
 from .deps import get_current_username
 from .firestore_client import get_db
 from .models import (
+    BulkUploadRequest,
+    BulkUploadResponse,
     CreateMember,
     Member,
     MoveRequest,
@@ -863,3 +865,223 @@ def move(req: MoveRequest, request: Request, username: str = Depends(get_current
         {"child_id": req.child_id, "parent_id": req.new_parent_id, "space_id": space_id}
     )
     return {"ok": True}
+
+
+def _to_title_case(s: Optional[str]) -> Optional[str]:
+    """Convert string to Title Case"""
+    if not s:
+        return s
+    return " ".join(word.capitalize() for word in s.split())
+
+
+@router.post("/bulk-upload", response_model=BulkUploadResponse)
+def bulk_upload_members(
+    upload_data: BulkUploadRequest,
+    request: Request,
+    username: str = Depends(get_current_username),
+):
+    """
+    Bulk upload family members from JSON data.
+    Only space admins can perform bulk uploads.
+    """
+    _ensure_auth_header(request)
+    db = get_db()
+
+    # Get user's current space
+    user_space_id = _get_user_space(username)
+
+    # Match family space name (case-insensitive)
+    target_space_name = upload_data.space_name.strip().lower()
+
+    # Get the target space from database
+    spaces = list(db.collection("family_spaces").stream())
+    matching_space = None
+    for space_doc in spaces:
+        space_data = space_doc.to_dict() or {}
+        space_name = space_data.get("name", "").strip().lower()
+        if space_name == target_space_name or space_doc.id.lower() == target_space_name:
+            matching_space = space_doc.id
+            break
+
+    if not matching_space:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Family space '{upload_data.space_name}' not found. "
+            "The space_name in the file must match an existing family space.",
+        )
+
+    # Verify user has access to this space (for now, allow if it's their current space)
+    # In future, add admin checks
+    if matching_space != user_space_id:
+        raise HTTPException(
+            status_code=403,
+            detail=f"You don't have permission to upload to space '{upload_data.space_name}'. "
+            "Please switch to this family space first.",
+        )
+
+    # Get existing members in the target space
+    existing_members_query = db.collection("members").where("space_id", "==", matching_space)
+    existing_members = {}
+    for doc in existing_members_query.stream():
+        member_data = doc.to_dict()
+        # Key by (first_name, last_name, dob) for deduplication
+        key = (
+            member_data.get("first_name", "").lower(),
+            member_data.get("last_name", "").lower(),
+            member_data.get("dob", ""),
+        )
+        existing_members[key] = doc.id
+
+    # Track statistics
+    total_in_file = len(upload_data.members)
+    uploaded_count = 0
+    already_present_count = 0
+    errors = []
+
+    # Map to track uploaded members by name for relationship establishment
+    uploaded_member_ids = {}  # (first_name, last_name) -> member_id
+
+    # First pass: Create all members
+    for idx, member_data in enumerate(upload_data.members):
+        try:
+            # Apply Title Case to names
+            first_name = _to_title_case(member_data.first_name)
+            last_name = _to_title_case(member_data.last_name)
+            nick_name = _to_title_case(member_data.nick_name) if member_data.nick_name else None
+            middle_name = (
+                _to_title_case(member_data.middle_name) if member_data.middle_name else None
+            )
+            birth_location = (
+                _to_title_case(member_data.birth_location) if member_data.birth_location else None
+            )
+            residence_location = (
+                _to_title_case(member_data.residence_location)
+                if member_data.residence_location
+                else None
+            )
+
+            # Check if member already exists
+            check_key = (first_name.lower(), last_name.lower(), member_data.dob)
+            if check_key in existing_members:
+                already_present_count += 1
+                uploaded_member_ids[(first_name, last_name)] = existing_members[check_key]
+                continue
+
+            # Create member
+            name_key = _name_key(first_name, last_name)
+            space_key = f"{matching_space}:{name_key}"
+
+            # Check uniqueness
+            key_ref = db.collection("member_keys").document(space_key)
+            if key_ref.get().exists:
+                already_present_count += 1
+                continue
+
+            # Create the member document
+            doc_ref = db.collection("members").document()
+            processed_hobbies = _parse_hobbies(member_data.hobbies)
+
+            member_doc = {
+                "first_name": first_name,
+                "last_name": last_name,
+                "nick_name": nick_name,
+                "middle_name": middle_name,
+                "dob": member_data.dob,
+                "is_deceased": member_data.is_deceased or False,
+                "date_of_death": member_data.date_of_death,
+                "birth_location": birth_location,
+                "residence_location": residence_location,
+                "email": member_data.email,
+                "phone": member_data.phone,
+                "hobbies": processed_hobbies,
+                "name_key": name_key,
+                "space_id": matching_space,
+                "created_by": username,
+            }
+
+            # Parse dob_ts
+            try:
+                member_doc["dob_ts"] = datetime.strptime(member_data.dob, "%m/%d/%Y").replace(
+                    tzinfo=timezone.utc
+                )
+            except Exception:
+                pass  # Leave dob_ts absent if unparsable
+
+            # Remove None values
+            member_doc = {k: v for k, v in member_doc.items() if v is not None}
+
+            doc_ref.set(member_doc)
+            key_ref.set({"member_id": doc_ref.id, "space_id": matching_space})
+
+            uploaded_member_ids[(first_name, last_name)] = doc_ref.id
+            uploaded_count += 1
+
+        except Exception as e:
+            errors.append(
+                f"Member {idx + 1} ({member_data.first_name} {member_data.last_name}): {str(e)}"
+            )
+
+    # Second pass: Establish relationships (parent-child and spouse)
+    for idx, member_data in enumerate(upload_data.members):
+        try:
+            first_name = _to_title_case(member_data.first_name)
+            last_name = _to_title_case(member_data.last_name)
+            member_id = uploaded_member_ids.get((first_name, last_name))
+
+            if not member_id:
+                continue  # Skip if member wasn't uploaded
+
+            # Handle parent relationship
+            if member_data.parent_name:
+                parent_parts = member_data.parent_name.strip().split(maxsplit=1)
+                if len(parent_parts) == 2:
+                    parent_first = _to_title_case(parent_parts[0])
+                    parent_last = _to_title_case(parent_parts[1])
+                    parent_id = uploaded_member_ids.get((parent_first, parent_last))
+
+                    if parent_id:
+                        # Create parent-child relation
+                        db.collection("relations").add(
+                            {
+                                "parent_id": parent_id,
+                                "child_id": member_id,
+                                "space_id": matching_space,
+                            }
+                        )
+
+            # Handle spouse relationship
+            if member_data.spouse_name:
+                spouse_parts = member_data.spouse_name.strip().split(maxsplit=1)
+                if len(spouse_parts) == 2:
+                    spouse_first = _to_title_case(spouse_parts[0])
+                    spouse_last = _to_title_case(spouse_parts[1])
+                    spouse_id = uploaded_member_ids.get((spouse_first, spouse_last))
+
+                    if spouse_id and spouse_id != member_id:
+                        # Set mutual spouse relationship
+                        member_ref = db.collection("members").document(member_id)
+                        spouse_ref = db.collection("members").document(spouse_id)
+                        member_ref.update({"spouse_id": spouse_id})
+                        spouse_ref.update({"spouse_id": member_id})
+
+        except Exception as e:
+            errors.append(
+                f"Relationship setup for member {idx + 1} "
+                f"({member_data.first_name} {member_data.last_name}): {str(e)}"
+            )
+
+    # Generate response message
+    message = None
+    if uploaded_count == 0 and already_present_count == total_in_file:
+        message = "All members in the file are already present in the family space."
+    elif uploaded_count > 0:
+        message = f"Successfully uploaded {uploaded_count} new member(s)."
+
+    return BulkUploadResponse(
+        success=len(errors) == 0,
+        total_in_file=total_in_file,
+        uploaded_count=uploaded_count,
+        already_present_count=already_present_count,
+        errors=errors,
+        message=message,
+    )

@@ -131,7 +131,12 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
         {authed && (
           <>
             {showBack && <Link className="btn secondary" href="/">Family Tree</Link>}
-            {showAdd && <Link className="btn secondary" href="/add">Add Member</Link>}
+            {showAdd && (
+              <>
+                <Link className="btn secondary" href="/add">Add Member</Link>
+                <Link className="btn secondary" href="/bulk-upload">Add Members</Link>
+              </>
+            )}
             <Link className="btn secondary" href="/events">Events</Link>
             {config.enable_map && <Link className="btn secondary" href="/map">Map</Link>}
           </>

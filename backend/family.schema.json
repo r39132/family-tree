@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Family Tree Bulk Upload Schema",
+  "description": "Schema for bulk uploading family tree members",
+  "type": "object",
+  "required": ["space_name", "members"],
+  "properties": {
+    "space_name": {
+      "type": "string",
+      "description": "Name of the family space (will be matched case-insensitively)",
+      "minLength": 1
+    },
+    "members": {
+      "type": "array",
+      "description": "Array of family members to upload",
+      "items": {
+        "type": "object",
+        "required": ["first_name", "last_name", "dob"],
+        "properties": {
+          "first_name": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Za-z-]+$",
+            "description": "First name (letters and hyphens only)"
+          },
+          "last_name": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Za-z-]+$",
+            "description": "Last name (letters and hyphens only)"
+          },
+          "nick_name": {
+            "type": "string",
+            "description": "Nickname (optional)"
+          },
+          "middle_name": {
+            "type": "string",
+            "description": "Middle name (optional)"
+          },
+          "dob": {
+            "type": "string",
+            "pattern": "^(0[1-9]|1[0-2])/(0[1-9]|[12][0-9]|3[01])/\\d{4}$",
+            "description": "Date of birth in MM/DD/YYYY format"
+          },
+          "is_deceased": {
+            "type": "boolean",
+            "description": "Whether the member is deceased (optional, default false)"
+          },
+          "date_of_death": {
+            "type": "string",
+            "pattern": "^(0[1-9]|1[0-2])/(0[1-9]|[12][0-9]|3[01])/\\d{4}$",
+            "description": "Date of death in MM/DD/YYYY format (optional)"
+          },
+          "birth_location": {
+            "type": "string",
+            "description": "Birth location (optional)"
+          },
+          "residence_location": {
+            "type": "string",
+            "description": "Current residence location (optional)"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address (optional)"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Phone number (optional)"
+          },
+          "hobbies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of hobbies (optional)"
+          },
+          "parent_name": {
+            "type": "string",
+            "description": "Full name of parent in format 'FirstName LastName' (optional, for establishing relationships)"
+          },
+          "spouse_name": {
+            "type": "string",
+            "description": "Full name of spouse in format 'FirstName LastName' (optional, for establishing relationships)"
+          }
+        }
+      }
+    }
+  }
+}
