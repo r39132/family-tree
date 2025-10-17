@@ -25,6 +25,7 @@ A full‑stack **Family Tree** application with modern web technologies, designe
 
 - **Authentication:** Login, register with invite codes, password reset
 - **Family Tree:** Visual tree with CRUD operations, member relationships
+- **Bulk Upload:** Import multiple family members from JSON files with automatic de-duplication
 - **Map Integration:** Optional Google Maps integration for member locations
 - **Quality Assurance:** Comprehensive testing, linting, and code formatting
 - **Development Tools:** Pre-commit hooks, syntax validation, and automated checks
@@ -90,6 +91,7 @@ pre-commit run --all-files
 
 - **[Architecture Overview](docs/ARCHITECTURE.md)** - Technical architecture, data flow, and sequence diagrams
 - **[Screenshots](docs/SCREENSHOTS.md)** - Application screenshots and UI examples
+- **[Bulk Upload Guide](docs/BULK_UPLOAD.md)** - Instructions for bulk uploading family members from JSON files
 - **[Deployment Guide](docs/DEPLOYMENT.md)** - CI/CD setup, Docker configuration, and cloud deployment
 - **[Event Notifications](docs/EVENT_NOTIFICATIONS.md)** - Automated email notifications setup and configuration
 - **[GitHub Actions Notifications](docs/GITHUB_ACTIONS_NOTIFICATIONS.md)** - Cloud-based automated notifications setup
