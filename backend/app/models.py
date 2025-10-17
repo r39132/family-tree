@@ -335,3 +335,40 @@ class SpaceSelectionRequest(BaseModel):
         if not v or not v.strip():
             raise ValueError("Space ID is required")
         return v.strip().lower()
+
+
+class BulkUploadMember(BaseModel):
+    """Model for a single member in bulk upload"""
+
+    first_name: str
+    last_name: str
+    dob: str
+    nick_name: Optional[str] = None
+    middle_name: Optional[str] = None
+    is_deceased: Optional[bool] = False
+    date_of_death: Optional[str] = None
+    birth_location: Optional[str] = None
+    residence_location: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    hobbies: List[str] = Field(default_factory=list)
+    parent_name: Optional[str] = None
+    spouse_name: Optional[str] = None
+
+
+class BulkUploadRequest(BaseModel):
+    """Model for bulk upload request"""
+
+    space_name: str
+    members: List[BulkUploadMember]
+
+
+class BulkUploadResponse(BaseModel):
+    """Response model for bulk upload"""
+
+    success: bool
+    total_in_file: int
+    uploaded_count: int
+    already_present_count: int
+    errors: List[str] = Field(default_factory=list)
+    message: Optional[str] = None
