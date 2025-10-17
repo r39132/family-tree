@@ -2,6 +2,7 @@ import { useRouter } from 'next/router';
 import { useEffect, useMemo, useState } from 'react';
 import TopNav from '../../components/TopNav';
 import { api } from '../../lib/api';
+import ProfilePicture from '../../components/ProfilePicture';
 
 export default function ViewMemberPage(){
   const router = useRouter();
@@ -50,69 +51,79 @@ export default function ViewMemberPage(){
         </h2>
         {error && <p style={{color:'crimson'}}>{error}</p>}
         {member && (
-          <div className="grid2">
-            <Field label="First Name" value={member.first_name} />
-            <Field label="Nick Name" value={member.nick_name} />
-            <Field label="Middle Name" value={member.middle_name} />
-            <Field label="Last Name" value={member.last_name} />
-            <Field label="Date of Birth" value={member.dob} />
-            <Field
-              label="Birth Location"
-              value={
-                member.birth_location ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>{member.birth_location}</span>
-                    {config.enable_map && (
-                      <button
-                        className="btn secondary"
-                        style={{ fontSize: '12px', padding: '4px 8px' }}
-                        onClick={() => router.push(`/map?layer=birth&member=${member.id}`)}
-                        aria-label="View birthplace on map"
-                      >
-                        View on Map
-                      </button>
-                    )}
-                  </div>
-                ) : '-'
-              }
-            />
-            <Field
-              label="Residence Location"
-              value={
-                member.residence_location ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>{member.residence_location}</span>
-                    {config.enable_map && (
-                      <button
-                        className="btn secondary"
-                        style={{ fontSize: '12px', padding: '4px 8px' }}
-                        onClick={() => router.push(`/map?layer=residence&member=${member.id}`)}
-                        aria-label="View residence on map"
-                      >
-                        View on Map
-                      </button>
-                    )}
-                  </div>
-                ) : '-'
-              }
-            />
-            <Field label="Email" value={member.email} />
-            <Field label="Phone" value={member.phone} />
-            <Field label="Hobbies" value={(member.hobbies||[]).join(', ')} />
-            <Field label="Deceased" value={member.is_deceased ? 'Yes' : 'No'} />
-            <Field
-              label="Spouse/Partner"
-              value={member.spouse_id ? (
-                spouse ? (
-                  <a href={`/view/${spouse.id}`} style={{textDecoration:'underline'}}>
-                    {spouse.first_name} {spouse.last_name}
-                  </a>
-                ) : (
-                  '(Unknown)'
-                )
-              ) : ''}
-            />
-          </div>
+          <>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+              <ProfilePicture
+                firstName={member.first_name}
+                lastName={member.last_name}
+                profilePictureUrl={member.profile_picture_url}
+                size={100}
+              />
+            </div>
+            <div className="grid2">
+              <Field label="First Name" value={member.first_name} />
+              <Field label="Nick Name" value={member.nick_name} />
+              <Field label="Middle Name" value={member.middle_name} />
+              <Field label="Last Name" value={member.last_name} />
+              <Field label="Date of Birth" value={member.dob} />
+              <Field
+                label="Birth Location"
+                value={
+                  member.birth_location ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>{member.birth_location}</span>
+                      {config.enable_map && (
+                        <button
+                          className="btn secondary"
+                          style={{ fontSize: '12px', padding: '4px 8px' }}
+                          onClick={() => router.push(`/map?layer=birth&member=${member.id}`)}
+                          aria-label="View birthplace on map"
+                        >
+                          View on Map
+                        </button>
+                      )}
+                    </div>
+                  ) : '-'
+                }
+              />
+              <Field
+                label="Residence Location"
+                value={
+                  member.residence_location ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>{member.residence_location}</span>
+                      {config.enable_map && (
+                        <button
+                          className="btn secondary"
+                          style={{ fontSize: '12px', padding: '4px 8px' }}
+                          onClick={() => router.push(`/map?layer=residence&member=${member.id}`)}
+                          aria-label="View residence on map"
+                        >
+                          View on Map
+                        </button>
+                      )}
+                    </div>
+                  ) : '-'
+                }
+              />
+              <Field label="Email" value={member.email} />
+              <Field label="Phone" value={member.phone} />
+              <Field label="Hobbies" value={(member.hobbies||[]).join(', ')} />
+              <Field label="Deceased" value={member.is_deceased ? 'Yes' : 'No'} />
+              <Field
+                label="Spouse/Partner"
+                value={member.spouse_id ? (
+                  spouse ? (
+                    <a href={`/view/${spouse.id}`} style={{textDecoration:'underline'}}>
+                      {spouse.first_name} {spouse.last_name}
+                    </a>
+                  ) : (
+                    '(Unknown)'
+                  )
+                ) : ''}
+              />
+            </div>
+          </>
         )}
         <div className="bottombar">
           <div className="bottombar-left"></div>
