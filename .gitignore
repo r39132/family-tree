@@ -10,21 +10,16 @@ __pycache__/
 *$py.class
 *.so
 .Python
+.venv/
 
 # Backend (Python)
-.venv/
-backend/__pycache__/
 backend/.pytest_cache/
-# backend/.coverage
 backend/.mypy_cache/
 backend/.ruff_cache/
 backend/.env
-# backend/coverage.xml
 backend/htmlcov/
 
 # Test artifacts
-# .coverage
-# coverage.xml
 htmlcov/
 .pytest_cache/
 *.cover
@@ -58,28 +53,15 @@ frontend/yarn-error.log*
 frontend/.pnp
 frontend/.pnp.js
 
-# Editors/OS
+# Editors/IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# Project-specific
-# Keep these directories but don't track them
+# Project-specific directories
 /screenshots/
-/scripts/
 /bug_analysis/
-
-# One-time migration scripts (keep locally but don't track)
-migrate_*.py
-seed_*.py
-fix_*.py
-cleanup_*.py
-analyze_*.py
-check_*.py
-run_space_tests.py
-
-# Documentation that's work in progress
-INSTAGRAM_INTEGRATION.md
-FAMILY_SPACES_SETUP.md
+/private_docs/
+/ingest/

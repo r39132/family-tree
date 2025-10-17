@@ -32,104 +32,59 @@ A full‑stack **Family Tree** application with modern web technologies, designe
 
 ## Quick Start
 
-### Prerequisites
+**Prerequisites:** Node 18+, Python 3.12.3, `uv` ([install](https://docs.astral.sh/uv/)), Google Cloud project with Firestore
 
-- Node 18+ and npm
-- Python 3.12.3
-- `uv` package manager ([install guide](https://docs.astral.sh/uv/))
-- Google Cloud project with Firestore database
-
-### Environment Setup
-
-1. **Backend configuration** - Create `backend/.env`:
-   ```bash
-   GOOGLE_CLOUD_PROJECT=your-project-id
-   FIRESTORE_DATABASE=family-tree
-   JWT_SECRET=your-secret-key
-   # Optional: Google Maps integration
-   ENABLE_MAP=true
-   GOOGLE_MAPS_API_KEY=your-maps-api-key
-   ```
-
-2. **Frontend configuration** - Create `frontend/.env.local`:
-   ```bash
-   NEXT_PUBLIC_API_BASE=http://localhost:8080
-   ```
-
-### Development
-
-1. **Setup development tools (recommended first step):**
-   ```bash
-   ./scripts/setup-dev-tools.sh
-   ```
-   This installs pre-commit hooks for:
-   - JSON/YAML syntax validation
-   - Python code formatting (Black, Ruff)
-   - TypeScript type checking
-   - ESLint for frontend code quality
-   - Automated tests on push
-
-2. **Setup Python environment:**
-   ```bash
-   cd backend
-   uv venv --python 3.12.3
-   uv sync
-   ```
-
-3. **Run backend:**
-   ```bash
-   cd backend
-   uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
-   ```
-
-4. **Run frontend:**
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
-
-5. **Access application:** http://localhost:3000
-
-### Docker Compose (Alternative)
+### Local Development
 
 ```bash
-docker compose up --build
+# 1. Setup dev tools (pre-commit hooks, linting)
+./scripts/setup-dev-tools.sh
+
+# 2. Configure environment
+# Create backend/.env with: GOOGLE_CLOUD_PROJECT, FIRESTORE_DATABASE, JWT_SECRET
+# Create frontend/.env.local with: NEXT_PUBLIC_API_BASE=http://localhost:8080
+
+# 3. Start backend
+cd backend && uv venv --python 3.12.3 && uv sync
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+
+# 4. Start frontend (in new terminal)
+cd frontend && npm install && npm run dev
 ```
+
+**Or use Docker:** `docker compose up --build`
+
+**Access:** http://localhost:3000
+
+## 🚀 Deployment
+
+**Deploy your own instance:** See [Forked Deployment Guide](docs/FORKED_DEPLOYMENT.md)
+
+**Quick steps:** Fork → Configure env vars → Run `gcp_bootstrap_family_tree.sh` → Initialize Firestore → Create admin → Deploy via GitHub Actions
+
+**Key scripts in `backend/scripts/`:**
+- `gcp_bootstrap_family_tree.sh` - GCP infrastructure setup
+- `initialize_collections.py` - Firestore database init
+- `seed_admin.py` - Create admin account
+- `populate_dummy_data.py` - Test data (optional)
+
+**Documentation:**
+- 📖 [Forked Deployment Guide](docs/FORKED_DEPLOYMENT.md) - Complete walkthrough
+- 🔧 [Backend Scripts Reference](docs/BACKEND_SCRIPTS.md) - Script usage details
+- ☁️ [Deployment Guide](docs/DEPLOYMENT.md) - CI/CD and cloud setup
 
 ## Testing
 
-### Backend Tests
 ```bash
-cd backend
-uv run pytest --cov=app
-```
+# Backend
+cd backend && uv run pytest --cov=app
 
-### Frontend Tests
-```bash
-cd frontend
-npm test
-```
+# Frontend
+cd frontend && npm test
 
-### Syntax and Code Quality Checks
-```bash
-# Run all pre-commit hooks manually
+# All quality checks
 pre-commit run --all-files
-
-# Frontend specific checks
-cd frontend
-npm run lint        # ESLint checks
-npm run type-check  # TypeScript validation
-
-# Backend specific checks
-cd backend
-uv run ruff check   # Python linting
-uv run black --check .  # Code formatting check
 ```
-
-## Deployment
-
-The project includes GitHub Actions workflow for automatic deployment to Google Cloud Run. See [Deployment Guide](docs/DEPLOYMENT.md) for complete setup details and troubleshooting.
 
 ## Documentation
 
@@ -141,42 +96,14 @@ The project includes GitHub Actions workflow for automatic deployment to Google 
 
 ## Contributing
 
-We welcome contributions! To get started:
-
-1. **Setup development tools:** `./scripts/setup-dev-tools.sh`
-2. **Read the [Contributing Guide](docs/CONTRIBUTING.md)** for detailed workflow and standards
-3. **Check the [Architecture Overview](docs/ARCHITECTURE.md)** to understand the codebase
-
-For quick development:
-```bash
-# Install pre-commit hooks
-pre-commit install
-
-# Run tests
-cd backend && uv run pytest
-cd frontend && npm test
-```
+1. Run `./scripts/setup-dev-tools.sh` to install pre-commit hooks
+2. Read [Contributing Guide](docs/CONTRIBUTING.md) for workflow and standards
+3. Check [Architecture Overview](docs/ARCHITECTURE.md) for codebase understanding
 
 ## License
 
-This project is dual-licensed:
+**AGPLv3 (default):** Open source use. Network deployment requires sharing source code. See [LICENSE](LICENSE).
 
-### AGPLv3 (Default)
+**Commercial license available** for proprietary use. Contact: [your-email@example.com]
 
-This software is licensed under the GNU Affero General Public License v3.0 (AGPLv3) for open source use. See the [LICENSE](LICENSE) file for details.
-
-Key requirements under AGPLv3:
-- **Source Code Availability**: If you run this software on a server and allow users to interact with it over a network, you must provide the source code to those users
-- **Copyleft**: Any modifications or derivative works must also be licensed under AGPLv3
-- **Attribution**: You must retain all copyright notices and license information
-
-### Commercial License
-
-For commercial use, closed-source derivatives, or applications where AGPLv3 requirements cannot be met, a separate commercial license is available.
-
-**Commercial license benefits:**
-- No requirement to disclose source code
-- Freedom to create proprietary derivatives
-- Commercial support and customization available
-
-For commercial licensing inquiries, please contact: [your-email@example.com]
+See [COMMERCIAL.md](docs/COMMERCIAL.md) for details.
