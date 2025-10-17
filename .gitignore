@@ -65,3 +65,16 @@ frontend/.pnp.js
 /bug_analysis/
 /private_docs/
 /ingest/
+
+# One-time migration scripts (keep locally but don't track)
+migrate_*.py
+seed_*.py
+fix_*.py
+cleanup_*.py
+analyze_*.py
+check_*.py
+run_space_tests.py
+
+# Documentation that's work in progress
+INSTAGRAM_INTEGRATION.md
+FAMILY_SPACES_SETUP.md

@@ -1,7 +1,7 @@
 import { useRouter } from 'next/router';
 import { useState, useRef } from 'react';
 import TopNav from '../components/TopNav';
-import { api } from '../lib/api';
+import { API_BASE } from '../lib/api';
 import LoadingOverlay from '../components/LoadingOverlay';
 
 interface UploadResponse {
@@ -17,27 +17,39 @@ export default function BulkUploadPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileContent, setFileContent] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [uploadResult, setUploadResult] = useState<UploadResponse | null>(null);
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       // Validate file type
       if (!file.name.endsWith('.json')) {
         setValidationErrors(['Please select a JSON file (.json extension)']);
         setSelectedFile(null);
+        setFileContent(null);
         return;
       }
-      setSelectedFile(file);
-      setValidationErrors([]);
-      setUploadResult(null);
+
+      try {
+        // Read file content immediately when selected
+        const content = await file.text();
+        setSelectedFile(file);
+        setFileContent(content);
+        setValidationErrors([]);
+        setUploadResult(null);
+      } catch (error) {
+        setValidationErrors(['Failed to read file. Please try again.']);
+        setSelectedFile(null);
+        setFileContent(null);
+      }
     }
   };
 
   const handleUpload = async () => {
-    if (!selectedFile) {
+    if (!selectedFile || !fileContent) {
       setValidationErrors(['Please select a file first']);
       return;
     }
@@ -47,10 +59,7 @@ export default function BulkUploadPage() {
     setUploadResult(null);
 
     try {
-      // Read file content
-      const fileContent = await selectedFile.text();
-      
-      // Parse JSON
+      // Parse JSON from stored content
       let jsonData;
       try {
         jsonData = JSON.parse(fileContent);
@@ -76,7 +85,7 @@ export default function BulkUploadPage() {
       // Extract space name from filename and compare
       const fileNameParts = selectedFile.name.replace('.json', '').toLowerCase();
       const spaceNameInFile = jsonData.space_name.toLowerCase();
-      
+
       if (!fileNameParts.includes(spaceNameInFile)) {
         setValidationErrors([
           `File name mismatch: The file name "${selectedFile.name}" should contain the family space name "${jsonData.space_name}".`
@@ -85,25 +94,55 @@ export default function BulkUploadPage() {
         return;
       }
 
-      // Send to API
-      const result = await api('/tree/bulk-upload', {
+      // Send to API with custom error handling (don't auto-logout on 403)
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${API_BASE}/tree/bulk-upload`, {
         method: 'POST',
+        headers,
         body: JSON.stringify(jsonData),
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+
+        // For 403, show the error message without logging out
+        if (response.status === 403) {
+          try {
+            const errorJson = JSON.parse(errorText);
+            setValidationErrors([errorJson.detail || 'Permission denied']);
+          } catch {
+            setValidationErrors([errorText || 'You do not have permission to upload to this space']);
+          }
+          setUploading(false);
+          return;
+        }
+
+        // For other errors, throw to be caught below
+        throw new Error(`${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
       setUploadResult(result);
-      
+
       if (result.success && result.uploaded_count > 0) {
         // Clear the file input after successful upload
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
         setSelectedFile(null);
+        setFileContent(null);
       }
 
     } catch (error: any) {
       const errorMsg = error?.message || 'Upload failed';
-      
+
       // Try to extract detailed error message
       if (errorMsg.includes(':')) {
         const parts = errorMsg.split(':');
@@ -116,25 +155,27 @@ export default function BulkUploadPage() {
     }
   };
 
-  const handleReset = () => {
-    setSelectedFile(null);
-    setValidationErrors([]);
-    setUploadResult(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
   return (
     <div className="container">
       <TopNav showAdd={false} />
-      
+
       <div className="card">
         <h2>Bulk Upload Members</h2>
         <p style={{ marginBottom: '16px', color: '#666' }}>
           Upload multiple family members from a JSON file. The file should follow the required format
           and the filename must contain the family space name (e.g., "demo.json" for the Demo space).
         </p>
+
+        <div style={{
+          backgroundColor: '#e3f2fd',
+          border: '1px solid #90caf9',
+          padding: '12px',
+          borderRadius: '4px',
+          marginBottom: '20px'
+        }}>
+          <strong>⚠️ Important:</strong> You must be in the target family space before uploading.
+          The space name in your JSON file must match your currently active family space.
+        </div>
 
         <div style={{ marginBottom: '20px' }}>
           <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
@@ -157,6 +198,10 @@ export default function BulkUploadPage() {
           {selectedFile && (
             <p style={{ marginTop: '8px', color: '#666', fontSize: '14px' }}>
               Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
+              <br />
+              <span style={{ fontSize: '12px', fontStyle: 'italic' }}>
+                Tip: Select a different file to start over
+              </span>
             </p>
           )}
         </div>
@@ -247,16 +292,7 @@ export default function BulkUploadPage() {
               Back to Tree
             </button>
           </div>
-          <div className="bottombar-right" style={{ display: 'flex', gap: '8px' }}>
-            {(selectedFile || uploadResult) && (
-              <button
-                className="btn secondary"
-                onClick={handleReset}
-                disabled={uploading}
-              >
-                Reset
-              </button>
-            )}
+          <div className="bottombar-right">
             <button
               className="btn"
               onClick={handleUpload}
