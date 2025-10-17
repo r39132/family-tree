@@ -4,6 +4,7 @@ Google Cloud Storage utilities for profile picture uploads.
 
 import io
 import uuid
+from datetime import timedelta
 from typing import Optional
 
 from google.cloud import storage
@@ -29,7 +30,7 @@ def upload_profile_picture(file_content: bytes, content_type: str, member_id: st
         member_id: The ID of the member this picture belongs to
 
     Returns:
-        The public URL of the uploaded image, or None if upload failed
+        A signed URL for the uploaded image (valid for 7 days), or None if upload failed
     """
     client = get_storage_client()
     if not client:
@@ -72,8 +73,14 @@ def upload_profile_picture(file_content: bytes, content_type: str, member_id: st
         # Upload with appropriate content type
         blob.upload_from_string(optimized_content, content_type="image/jpeg")
 
-        # Return public URL (bucket is already configured for public access via IAM)
-        return blob.public_url
+        # Generate a signed URL (valid for 7 days) for secure access without public bucket
+        signed_url = blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(days=7),
+            method="GET",
+        )
+
+        return signed_url
 
     except Exception as e:
         print(f"Error uploading to GCS: {e}")
@@ -85,7 +92,7 @@ def delete_profile_picture(picture_url: str) -> bool:
     Delete a profile picture from Google Cloud Storage.
 
     Args:
-        picture_url: The public URL of the image to delete
+        picture_url: The signed URL or path of the image to delete
 
     Returns:
         True if deletion was successful, False otherwise
@@ -96,11 +103,13 @@ def delete_profile_picture(picture_url: str) -> bool:
 
     try:
         # Extract blob name from URL
-        # Format: https://storage.googleapis.com/bucket-name/path/to/file
+        # Format: https://storage.googleapis.com/bucket-name/path/to/file or signed URL
         if settings.gcs_bucket_name not in picture_url:
             return False
 
-        blob_name = picture_url.split(f"{settings.gcs_bucket_name}/")[-1]
+        # For signed URLs, extract the path before the query parameters
+        url_path = picture_url.split("?")[0]
+        blob_name = url_path.split(f"{settings.gcs_bucket_name}/")[-1]
         bucket = client.bucket(settings.gcs_bucket_name)
         blob = bucket.blob(blob_name)
         blob.delete()

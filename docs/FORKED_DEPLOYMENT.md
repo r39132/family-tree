@@ -125,15 +125,20 @@ The script will output:
 # Create a GCS bucket for storing profile pictures
 gsutil mb -p your-project-id -l us-central1 gs://your-project-id-profile-pictures
 
-# Make bucket publicly readable (required for displaying images)
-gsutil iam ch allUsers:objectViewer gs://your-project-id-profile-pictures
-
-# Enable uniform bucket-level access (recommended)
+# Enable uniform bucket-level access (modern IAM approach)
 gsutil uniformbucketlevelaccess set on gs://your-project-id-profile-pictures
+
+# Grant service account storage permissions (replace with your service account email)
+gsutil iam ch serviceAccount:family-tree-runtime@your-project-id.iam.gserviceaccount.com:objectAdmin gs://your-project-id-profile-pictures
 ```
 
 **Recommended bucket name:** `{your-project-id}-profile-pictures`
 **Example:** `family-tree-469815-profile-pictures`
+
+**Security Note:**
+- ⚠️ **No public access** - Bucket remains private
+- ✅ **Signed URLs** - Images accessed via time-limited signed URLs (7 days)
+- ✅ **Service account only** - Only your runtime service account has access
 
 **Note:** This bucket name should match the `GCS_BUCKET_NAME` value in your `backend/.env` file.
 

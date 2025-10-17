@@ -22,7 +22,7 @@ This script sets up:
 - Required GCP APIs (Cloud Run, Artifact Registry, Cloud Storage)
 - Service accounts for deployment and runtime
 - IAM bindings and permissions
-- GCS bucket for profile pictures with public access
+- GCS bucket for profile pictures with private access (signed URLs)
 - Uniform bucket-level access for modern IAM
 
 Arguments (all optional, defaults shown):
@@ -53,7 +53,7 @@ Environment:
 GCS Bucket:
   Bucket name will be: \${PROJECT_ID}-profile-pictures
   Location: Same as REGION parameter
-  Access: Public read (allUsers:objectViewer), runtime SA has objectAdmin
+  Access: Private (runtime SA has objectAdmin, uses signed URLs for secure access)
 
 EOF
   exit 0
@@ -204,11 +204,7 @@ main() {
   # Grant service usage permissions to runtime SA (required for quota checks)
   bind_role "serviceAccount:${RUNTIME_SA_EMAIL}" "roles/serviceusage.serviceUsageConsumer"
 
-  # Make bucket publicly readable (for profile picture URLs)
-  note "Making bucket publicly readable"
-  gsutil iam ch "allUsers:objectViewer" "gs://${GCS_BUCKET_NAME}"
-
-  ok "GCS bucket configured for profile pictures"
+  ok "GCS bucket configured for profile pictures (private access only)"
 
   # 6) (Optional) Create deployer key for GitHub Actions
   maybe_make_key "$DEPLOYER_SA_EMAIL" "$KEY_OUTPUT_PATH"

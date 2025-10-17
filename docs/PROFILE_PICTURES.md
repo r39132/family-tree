@@ -4,7 +4,7 @@ This document explains how to set up and use the profile picture upload feature 
 
 ## Overview
 
-The profile picture feature allows users to upload and display profile pictures for family tree members. Images are automatically optimized and stored in Google Cloud Storage.
+The profile picture feature allows users to upload and display profile pictures for family tree members. Images are automatically optimized and stored securely in Google Cloud Storage with signed URLs for private access.
 
 ## Features
 
@@ -17,8 +17,11 @@ The profile picture feature allows users to upload and display profile pictures 
   - Transparent backgrounds converted to white
 - **Size Limit:** Configurable (default 5MB)
 - **Preview:** Circular preview before and after upload
-- **Fallback:** Shows initials in colored circle when no picture exists
-- **Security:** Requires authentication and member access validation
+- **Security:**
+  - Requires authentication and member access validation
+  - Private bucket with signed URLs (no public access)
+  - URLs valid for 7 days, automatically refreshed
+- **No Placeholder:** Shows no avatar when picture doesn't exist (clean appearance)
 
 ## Setup
 
@@ -31,12 +34,18 @@ PROJECT_ID="your-project-id"
 # Create bucket (replace with your project ID)
 gsutil mb -p $PROJECT_ID -l us-central1 gs://${PROJECT_ID}-profile-pictures
 
-# Make bucket publicly readable (required for displaying images)
-gsutil iam ch allUsers:objectViewer gs://${PROJECT_ID}-profile-pictures
-
-# Enable uniform bucket-level access (recommended for security)
+# Enable uniform bucket-level access (modern IAM approach)
 gsutil uniformbucketlevelaccess set on gs://${PROJECT_ID}-profile-pictures
+
+# Grant service account storage permissions
+# Replace with your service account email
+gsutil iam ch serviceAccount:family-tree-runtime@${PROJECT_ID}.iam.gserviceaccount.com:objectAdmin gs://${PROJECT_ID}-profile-pictures
 ```
+
+**Important Security Notes:**
+- ⚠️ **No public access required** - Uses signed URLs for secure image access
+- ⚠️ **Private bucket** - Only the service account has access
+- ✅ **Signed URLs** - Images accessible via time-limited signed URLs (7 days)
 
 **Bucket Naming Convention:** `{project-id}-profile-pictures`
 
@@ -168,12 +177,12 @@ curl -X POST \
 3. **Storage:**
    - Generate unique filename: `profile-pictures/{member_id}/{uuid}.jpg`
    - Upload to Google Cloud Storage
-   - Make blob publicly readable
-   - Return public URL
+   - Generate signed URL (valid for 7 days)
+   - Return signed URL
 
 4. **Update:**
    - Delete old picture from GCS (if exists)
-   - Update member's `profile_picture_url` in Firestore
+   - Update member's `profile_picture_url` in Firestore with signed URL
 
 ### Storage Structure
 
@@ -192,7 +201,9 @@ gs://your-bucket-name/
 - **Authentication Required:** All uploads require valid JWT token
 - **Access Control:** Users can only upload for members in their space
 - **File Validation:** Server-side validation of file types and sizes
-- **Public URLs:** Images are publicly readable (required for display)
+- **Private Storage:** Bucket is private, no public access granted
+- **Signed URLs:** Time-limited URLs (7 days) for secure image access
+- **Automatic Refresh:** Application regenerates signed URLs when needed
 - **Unique Filenames:** UUID prevents filename collisions
 - **Old File Cleanup:** Previous pictures are deleted on new upload
 
@@ -224,11 +235,13 @@ gcloud projects get-iam-policy your-project-id
 
 ### "Images not displaying"
 
-**Cause:** Bucket not publicly readable
+**Cause:** Signed URL expired (after 7 days) or invalid
 
 **Solution:**
+- Application automatically regenerates signed URLs when needed
+- If images still don't display, check service account has `objectAdmin` role:
 ```bash
-gsutil iam ch allUsers:objectViewer gs://your-bucket-name
+gsutil iam get gs://your-bucket-name
 ```
 
 ### "File too large" errors
