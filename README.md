@@ -25,6 +25,7 @@ A full‑stack **Family Tree** application with modern web technologies, designe
 
 - **Authentication:** Login, register with invite codes, password reset
 - **Family Tree:** Visual tree with CRUD operations, member relationships
+- **Profile Pictures:** Upload and manage member profile pictures with automatic optimization
 - **Bulk Upload:** Import multiple family members from JSON files with automatic de-duplication
 - **Map Integration:** Optional Google Maps integration for member locations
 - **Quality Assurance:** Comprehensive testing, linting, and code formatting
@@ -42,8 +43,14 @@ A full‑stack **Family Tree** application with modern web technologies, designe
 ./scripts/setup-dev-tools.sh
 
 # 2. Configure environment
-# Create backend/.env with: GOOGLE_CLOUD_PROJECT, FIRESTORE_DATABASE, JWT_SECRET
-# Create frontend/.env.local with: NEXT_PUBLIC_API_BASE=http://localhost:8080
+# Create backend/.env with:
+#   - GOOGLE_CLOUD_PROJECT=your-project-id
+#   - FIRESTORE_DATABASE=family-tree
+#   - JWT_SECRET=your-secret-key
+#   - GCS_BUCKET_NAME=your-bucket-name  # For profile pictures
+#   - MAX_UPLOAD_SIZE_MB=5  # Optional, defaults to 5MB
+# Create frontend/.env.local with:
+#   - NEXT_PUBLIC_API_BASE=http://localhost:8080
 
 # 3. Start backend
 cd backend && uv venv --python 3.12.3 && uv sync
