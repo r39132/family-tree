@@ -7,3 +7,7 @@ __pycache__/
 .env
 uv.lock
 *.pyc
+scripts/
+# Sample/test JSON files - exclude from git
+*.json
+!family.schema.json
