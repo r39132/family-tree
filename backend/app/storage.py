@@ -72,9 +72,7 @@ def upload_profile_picture(file_content: bytes, content_type: str, member_id: st
         # Upload with appropriate content type
         blob.upload_from_string(optimized_content, content_type="image/jpeg")
 
-        # Make the blob publicly readable
-        blob.make_public()
-
+        # Return public URL (bucket is already configured for public access via IAM)
         return blob.public_url
 
     except Exception as e:
