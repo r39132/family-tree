@@ -12,6 +12,7 @@ app/routes_events.py
 app/routes_spaces.py
 app/routes_tree.py
 app/routes_user.py
+app/storage.py
 app/utils/__init__.py
 app/utils/time.py
 family_tree_api.egg-info/PKG-INFO
@@ -25,6 +26,8 @@ tests/test_admin_routes_coverage.py
 tests/test_auth_additional_coverage.py
 tests/test_auth_routes_coverage.py
 tests/test_auth_utils.py
+tests/test_bulk_upload.py
+tests/test_bulk_upload_integration.py
 tests/test_comprehensive_coverage.py
 tests/test_config_endpoint.py
 tests/test_config_env_parsing.py
@@ -46,6 +49,7 @@ tests/test_main.py
 tests/test_main_coverage.py
 tests/test_models_config.py
 tests/test_models_coverage.py
+tests/test_profile_picture.py
 tests/test_public_invite.py
 tests/test_simple_coverage.py
 tests/test_spaces.py
