@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .routes_admin import router as admin_router
+from .routes_album import router as album_router
 from .routes_auth import router as auth_router
 from .routes_events import router as events_router
 from .routes_spaces import ensure_default_spaces
@@ -72,6 +73,7 @@ app.include_router(events_router)
 app.include_router(admin_router)
 app.include_router(user_router)
 app.include_router(spaces_router)
+app.include_router(album_router)
 
 # Initialize default family spaces on startup
 try:
