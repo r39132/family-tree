@@ -259,7 +259,12 @@ main() {
      --platform managed \\
      --service-account ${RUNTIME_SA_EMAIL} \\
      --allow-unauthenticated \\
-     --set-env-vars "GOOGLE_CLOUD_PROJECT=\${{ secrets.GCP_PROJECT_ID }},FIRESTORE_DATABASE=family-tree,GCS_BUCKET_NAME=${GCS_BUCKET_NAME},ALBUM_BUCKET_NAME=${ALBUM_BUCKET_NAME},MAX_UPLOAD_SIZE_MB=5,ALBUM_MAX_UPLOAD_SIZE_MB=5"
+     --set-env-vars "GOOGLE_CLOUD_PROJECT=\${{ secrets.GCP_PROJECT_ID }}" \\
+     --set-env-vars "FIRESTORE_DATABASE=family-tree" \\
+     --set-env-vars "GCS_BUCKET_NAME=${GCS_BUCKET_NAME}" \\
+     --set-env-vars "ALBUM_BUCKET_NAME=${ALBUM_BUCKET_NAME}" \\
+     --set-env-vars "MAX_UPLOAD_SIZE_MB=5" \\
+     --set-env-vars "ALBUM_MAX_UPLOAD_SIZE_MB=5"
 
 3) If you prefer uploading the key with GitHub CLI:
    base64 -w0 "${KEY_OUTPUT_PATH}" | gh secret set GCP_SA_KEY

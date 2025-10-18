@@ -155,7 +155,7 @@ The album page displays helpful statistics:
 ### API Endpoints
 
 - `POST /spaces/{space_id}/album/photos` - Upload photo
-- `GET /spaces/{space_id}/album/photos` - List photos with filters/sorting
+- `GET /spaces/{space_id}/album/photos` - List photos (supports filters: uploader, tags, sort_by, sort_order, limit)
 - `GET /spaces/{space_id}/album/photos/{photo_id}` - Get single photo
 - `DELETE /spaces/{space_id}/album/photos/{photo_id}` - Delete photo
 - `POST /spaces/{space_id}/album/photos/{photo_id}/like` - Like photo
