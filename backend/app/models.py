@@ -36,6 +36,8 @@ class ResetRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    current_space: Optional[str] = None
+    last_accessed_space_id: Optional[str] = None
 
 
 class Member(BaseModel):

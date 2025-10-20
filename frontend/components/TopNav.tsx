@@ -16,6 +16,7 @@ type UserInfo = {
   roles?: string[];
   profile_photo_data_url?: string;
   current_space?: string;
+  last_accessed_space_id?: string;
 };
 
 type AppConfig = {
@@ -35,6 +36,7 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [currentSpace, setCurrentSpace] = useState<FamilySpace | null>(null);
   const [availableSpaces, setAvailableSpaces] = useState<FamilySpace[]>([]);
+  const [spacesLoaded, setSpacesLoaded] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [config, setConfig] = useState<AppConfig>({ enable_map: false, require_invite: true });
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -51,10 +53,16 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
           .then(data => {
             setUserInfo(data);
             // Fetch current space details if user has one
-            if (data.current_space) {
-              api(`/spaces/${data.current_space}`)
+            const candidateSpace = data.current_space || data.last_accessed_space_id;
+            if (candidateSpace) {
+              api(`/spaces/${candidateSpace}`)
                 .then(space => setCurrentSpace(space))
-                .catch(err => console.error('Failed to fetch current space:', err));
+                .catch(err => {
+                  console.error('Failed to fetch current space:', err);
+                  setCurrentSpace(null);
+                });
+            } else {
+              setCurrentSpace(null);
             }
           })
           .catch(err => {
@@ -67,8 +75,14 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
 
         // Fetch available spaces
         api('/spaces')
-          .then(spaces => setAvailableSpaces(spaces))
-          .catch(err => console.error('Failed to fetch spaces:', err));
+          .then(spaces => {
+            setAvailableSpaces(spaces);
+            setSpacesLoaded(true);
+          })
+          .catch(err => {
+            console.error('Failed to fetch spaces:', err);
+            setSpacesLoaded(true);
+          });
 
         // Fetch app configuration
         api('/config')
@@ -79,6 +93,45 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
       }
     }
   },[]);   // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!userInfo || !spacesLoaded) {
+      return;
+    }
+
+    const preferredSpaceId = userInfo.current_space || userInfo.last_accessed_space_id;
+    const hasPreferred = preferredSpaceId ? availableSpaces.some(space => space.id === preferredSpaceId) : false;
+
+    if (hasPreferred) {
+      if (!preferredSpaceId) {
+        return;
+      }
+      if (!currentSpace || currentSpace.id !== preferredSpaceId) {
+        api(`/spaces/${preferredSpaceId}`)
+          .then(space => setCurrentSpace(space))
+          .catch(err => console.error('Failed to fetch current space:', err));
+      }
+      return;
+    }
+
+    const fallbackSpaceId = availableSpaces[0]?.id;
+    if (!fallbackSpaceId) {
+      if (currentSpace) {
+        setCurrentSpace(null);
+      }
+      return;
+    }
+
+    api('/user/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify({ last_accessed_space_id: fallbackSpaceId })
+    }).catch(err => console.error('Failed to update preferences:', err));
+
+    api(`/spaces/${fallbackSpaceId}`)
+      .then(space => setCurrentSpace(space))
+      .catch(err => console.error('Failed to fetch current space:', err));
+
+    setUserInfo(prev => prev ? { ...prev, current_space: fallbackSpaceId, last_accessed_space_id: fallbackSpaceId } : null);
+  }, [userInfo, spacesLoaded, availableSpaces, currentSpace]);
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -97,6 +150,9 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
       localStorage.removeItem('token');
     }
     setUserInfo(null);
+    setCurrentSpace(null);
+    setAvailableSpaces([]);
+    setSpacesLoaded(false);
     setDropdownOpen(false);
     router.push('/login');
   }
@@ -112,11 +168,16 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
         body: JSON.stringify({ space_id: spaceId })
       });
 
+      await api('/user/preferences', {
+        method: 'PATCH',
+        body: JSON.stringify({ last_accessed_space_id: spaceId })
+      }).catch(err => console.error('Failed to persist last accessed space:', err));
+
       // Update current space
       const newSpace = availableSpaces.find(s => s.id === spaceId);
       if (newSpace) {
         setCurrentSpace(newSpace);
-        setUserInfo(prev => prev ? { ...prev, current_space: spaceId } : null);
+        setUserInfo(prev => prev ? { ...prev, current_space: spaceId, last_accessed_space_id: spaceId } : null);
       }
 
       // Refresh the page to reload data for new space

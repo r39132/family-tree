@@ -38,8 +38,8 @@ def _get_user_space(username: str) -> str:
     if not user_doc.exists:
         return "demo"  # Default fallback
 
-    data = user_doc.to_dict()
-    return data.get("current_space", "demo")
+    data = user_doc.to_dict() or {}
+    return data.get("current_space") or data.get("last_accessed_space_id") or "demo"
 
 
 def send_mail(to_email: str, subject: str, body: str):
@@ -270,17 +270,25 @@ def login(payload: LoginRequest):
             detail="Your account has been evicted. Please contact an administrator.",
         )
 
-    # Handle space selection if provided
+    # Determine which space should be active
+    target_space_id: Optional[str] = None
     if payload.space_id:
         # Validate that the space exists
         space_ref = db.collection("family_spaces").document(payload.space_id)
         if not space_ref.get().exists:
             raise HTTPException(status_code=400, detail="Selected family space not found")
-
-        # Update user's current space
-        db.collection("users").document(payload.username).update(
-            {"current_space": payload.space_id}
+        target_space_id = payload.space_id
+    else:
+        target_space_id = (
+            data.get("current_space")
+            or data.get("last_accessed_space_id")
+            or "demo"
         )
+
+    update_space_payload = {}
+    if target_space_id:
+        update_space_payload["current_space"] = target_space_id
+        update_space_payload["last_accessed_space_id"] = target_space_id
 
     # Issue token and update login stats with epoch timestamps
     import time
@@ -298,7 +306,12 @@ def login(payload: LoginRequest):
         update_data["first_login_at"] = now_epoch
 
     db.collection("users").document(payload.username).update(update_data)
-    return TokenResponse(access_token=token)
+
+    return TokenResponse(
+        access_token=token,
+        current_space=target_space_id,
+        last_accessed_space_id=target_space_id,
+    )
 
 
 @router.get("/me")
@@ -332,7 +345,12 @@ def switch_space(
 
     # Update user's current space
     user_ref = db.collection("users").document(current_user)
-    user_ref.update({"current_space": space_request.space_id})
+    user_ref.update(
+        {
+            "current_space": space_request.space_id,
+            "last_accessed_space_id": space_request.space_id,
+        }
+    )
 
     return {"message": "Family space updated successfully", "current_space": space_request.space_id}
 

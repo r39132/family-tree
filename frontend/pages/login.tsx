@@ -14,7 +14,7 @@ interface FamilySpace {
 export default function Login(){
   const [username,setUsername]=useState('');
   const [password,setPassword]=useState('');
-  const [selectedSpace,setSelectedSpace]=useState('demo');
+  const [selectedSpace,setSelectedSpace]=useState('');
   const [availableSpaces,setAvailableSpaces]=useState<FamilySpace[]>([]);
   const [showPass,setShowPass]=useState(false);
   const [remember,setRemember]=useState(true);
@@ -47,7 +47,7 @@ export default function Login(){
   }, []);
 
   // Check if form is valid (all required fields filled)
-  const isFormValid = username.trim() !== '' && password.trim() !== '' && selectedSpace.trim() !== '';
+  const isFormValid = username.trim() !== '' && password.trim() !== '';
 
   function getErrorMessage(errorText: string): string {
     // Convert generic error messages to user-friendly ones
@@ -84,16 +84,21 @@ export default function Login(){
     try{
       // Use direct fetch instead of api() to handle eviction errors specifically
       const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8080";
+      const bodyPayload: Record<string, string> = {
+        username,
+        password,
+      };
+
+      if (selectedSpace.trim()) {
+        bodyPayload.space_id = selectedSpace.trim();
+      }
+
       const response = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          username,
-          password,
-          space_id: selectedSpace
-        })
+        body: JSON.stringify(bodyPayload)
       });
 
       if (!response.ok) {
@@ -179,7 +184,7 @@ export default function Login(){
                 )}
               </button>
             </div>
-            <label htmlFor="familySpace">Family Space</label>
+            <label htmlFor="familySpace">Family Space (optional)</label>
             <select
               id="familySpace"
               className="input"
@@ -187,6 +192,7 @@ export default function Login(){
               onChange={e=>setSelectedSpace(e.target.value)}
               title="Select your family space"
             >
+              <option value="">Last accessed space (automatic)</option>
               {availableSpaces.map(space => (
                 <option key={space.id} value={space.id}>
                   {space.name}
