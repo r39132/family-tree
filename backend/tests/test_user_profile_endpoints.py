@@ -174,3 +174,44 @@ def test_upload_profile_photo_invalid_format_and_base64_and_too_large():
         headers=_auth_headers(),
     )
     assert r3.status_code == 422
+
+
+def test_update_preferences_sets_last_accessed_space():
+    client = TestClient(app)
+    fake_db.collection("family_spaces").document("demo").set({"name": "Demo"})
+    fake_db.collection("users").document("tester").set({
+        "email": "tester@example.com",
+        "current_space": "demo",
+        "last_accessed_space_id": None,
+    })
+
+    r = client.patch(
+        "/user/preferences",
+        json={"last_accessed_space_id": "demo"},
+        headers=_auth_headers(),
+    )
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["current_space"] == "demo"
+    assert data["last_accessed_space_id"] == "demo"
+
+    doc = fake_db.collection("users").document("tester").get()
+    assert doc.exists
+    saved = doc.to_dict()
+    assert saved["current_space"] == "demo"
+    assert saved["last_accessed_space_id"] == "demo"
+
+
+def test_update_preferences_unknown_space_rejected():
+    client = TestClient(app)
+    fake_db.collection("users").document("tester").set({"email": "tester@example.com"})
+
+    r = client.patch(
+        "/user/preferences",
+        json={"last_accessed_space_id": "missing"},
+        headers=_auth_headers(),
+    )
+
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Family space not found"

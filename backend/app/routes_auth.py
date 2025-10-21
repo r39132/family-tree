@@ -305,6 +305,9 @@ def login(payload: LoginRequest):
     if not data.get("first_login_at"):
         update_data["first_login_at"] = now_epoch
 
+    if update_space_payload:
+        update_data.update(update_space_payload)
+
     db.collection("users").document(payload.username).update(update_data)
 
     return TokenResponse(
