@@ -25,7 +25,7 @@ The Family Album feature allows family space members to upload, share, view, and
   - Likes (most/least liked)
   - Filename (alphabetical)
   - Uploader (group by uploader)
-  
+
 - **Filter Options**:
   - By Tags: Filter photos by one or more tags
   - Clear Filters: Easy reset to show all photos
@@ -114,8 +114,9 @@ The album page displays helpful statistics:
 ### Storage
 - **Original Photos**: Stored in GCS bucket at `{space-id}/originals/{photo-id}.jpg`
 - **Thumbnails**: Stored in GCS bucket at `{space-id}/thumbnails/{photo-id}_thumb.jpg`
-- **CDN**: Photos served via CDN for fast loading
-- **Signed URLs**: Time-limited access tokens (7-day expiration)
+- **Bucket**: Dedicated `ALBUM_BUCKET_NAME` bucket (separate from profile pictures)
+- **Access**: Private bucket with signed URLs (no public access)
+- **Signed URLs**: Time-limited access tokens (7-day expiration by default)
 
 ### Database Schema
 
@@ -171,18 +172,17 @@ The following environment variables configure the album feature:
 # Album bucket name (required for photo storage)
 ALBUM_BUCKET_NAME=my-project-family-albums
 
-# Maximum upload size in MB (default: 5)
-ALBUM_MAX_UPLOAD_SIZE_MB=5
+# Maximum upload size in MB (default: 10)
+ALBUM_MAX_UPLOAD_SIZE_MB=10
 
 # Thumbnail size in pixels (default: 300)
 ALBUM_THUMBNAIL_SIZE=300
 
-# CDN base URL (optional, uses signed URLs if not set)
-CDN_BASE_URL=https://cdn.example.com
-
 # Signed URL expiration in days (default: 7)
 SIGNED_URL_EXPIRATION_DAYS=7
 ```
+
+**Note:** The bootstrap script (`backend/scripts/gcp_bootstrap_family_tree.sh`) automatically creates the album bucket with the correct permissions and uniform bucket-level access.
 
 ## Future Enhancements
 
