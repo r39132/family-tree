@@ -31,6 +31,10 @@ export default function Login(){
         if (response.ok) {
           const spaces = await response.json();
           setAvailableSpaces(spaces);
+          // If there's only one available space, pre-select it to avoid showing an "automatic" placeholder
+          if (Array.isArray(spaces) && spaces.length === 1) {
+            setSelectedSpace(spaces[0].id);
+          }
         }
       } catch (err) {
         console.error('Failed to fetch family spaces:', err);
@@ -184,22 +188,49 @@ export default function Login(){
                 )}
               </button>
             </div>
-            <label htmlFor="familySpace">Family Space (optional)</label>
-            <select
-              id="familySpace"
-              className="input"
-              value={selectedSpace}
-              onChange={e=>setSelectedSpace(e.target.value)}
-              title="Select your family space"
-            >
-              <option value="">Last accessed space (automatic)</option>
-              {availableSpaces.map(space => (
-                <option key={space.id} value={space.id}>
-                  {space.name}
-                  {space.description && ` - ${space.description}`}
-                </option>
-              ))}
-            </select>
+            {/* Only show Family Space dropdown if there are multiple spaces available */}
+            {availableSpaces.length > 1 && (
+              <>
+                <label htmlFor="familySpace">Family Space (optional)</label>
+                <select
+                  id="familySpace"
+                  className="input"
+                  value={selectedSpace}
+                  onChange={e=>setSelectedSpace(e.target.value)}
+                  title="Select your family space"
+                >
+                  {/*
+                    Empty value means: don't send a space_id to the backend and let the server
+                    pick the user's last accessed/current space automatically.
+                  */}
+                  <option value="">Use last accessed space (automatic)</option>
+                  {availableSpaces.map(space => (
+                    <option key={space.id} value={space.id}>
+                      {space.name}
+                      {space.description && ` - ${space.description}`}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+            {/* Show read-only family space name when there's only one space */}
+            {availableSpaces.length === 1 && (
+              <>
+                <label htmlFor="familySpace">Family Space</label>
+                <div
+                  className="input"
+                  style={{
+                    backgroundColor: '#f5f5f5',
+                    color: '#666',
+                    cursor: 'default'
+                  }}
+                  title={`You will log into: ${availableSpaces[0].name}`}
+                >
+                  {availableSpaces[0].name}
+                  {availableSpaces[0].description && ` - ${availableSpaces[0].description}`}
+                </div>
+              </>
+            )}
           <label><input type="checkbox" className="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)}/>Remember me</label>
           <div className="bottombar">
             <div className="bottombar-left">
