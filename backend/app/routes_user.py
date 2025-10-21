@@ -18,6 +18,7 @@ class ProfileResponse(BaseModel):
     profile_photo_data_url: Optional[str] = None
     roles: Optional[list[str]] = None
     current_space: Optional[str] = None
+    last_accessed_space_id: Optional[str] = None
 
 
 class ProfileUpdate(BaseModel):
@@ -65,6 +66,20 @@ class PhotoUpdate(BaseModel):
         return v
 
 
+class PreferencesUpdate(BaseModel):
+    last_accessed_space_id: Optional[str] = None
+
+    @field_validator("last_accessed_space_id")
+    @classmethod
+    def _clean_space_id(cls, v: Optional[str]):
+        if v is None:
+            return v
+        v = v.strip().lower()
+        if not v:
+            raise ValueError("must not be empty")
+        return v
+
+
 @router.get("/profile", response_model=ProfileResponse)
 def get_profile(current_user: str = Depends(get_current_username)):
     db = get_db()
@@ -72,6 +87,7 @@ def get_profile(current_user: str = Depends(get_current_username)):
     if not doc.exists:
         raise HTTPException(status_code=404, detail="User not found")
     data = doc.to_dict() or {}
+    current_space = data.get("current_space") or data.get("last_accessed_space_id") or "demo"
     return ProfileResponse(
         username=current_user,
         email=data.get("email"),
@@ -79,7 +95,8 @@ def get_profile(current_user: str = Depends(get_current_username)):
         last_name=data.get("last_name"),
         profile_photo_data_url=data.get("profile_photo_data_url"),
         roles=data.get("roles", []),
-        current_space=data.get("current_space", "demo"),
+        current_space=current_space,
+        last_accessed_space_id=data.get("last_accessed_space_id"),
     )
 
 
@@ -102,6 +119,7 @@ def update_profile(update: ProfileUpdate, current_user: str = Depends(get_curren
 
     # Return updated
     new_doc = ref.get().to_dict() or {}
+    current_space = new_doc.get("current_space") or new_doc.get("last_accessed_space_id") or "demo"
     return ProfileResponse(
         username=current_user,
         email=new_doc.get("email"),
@@ -109,7 +127,8 @@ def update_profile(update: ProfileUpdate, current_user: str = Depends(get_curren
         last_name=new_doc.get("last_name"),
         profile_photo_data_url=new_doc.get("profile_photo_data_url"),
         roles=new_doc.get("roles", []),
-        current_space=new_doc.get("current_space", "demo"),
+        current_space=current_space,
+        last_accessed_space_id=new_doc.get("last_accessed_space_id"),
     )
 
 
@@ -125,6 +144,7 @@ def upload_profile_photo(update: PhotoUpdate, current_user: str = Depends(get_cu
     ref.update({"profile_photo_data_url": update.image_data_url})
 
     new_doc = ref.get().to_dict() or {}
+    current_space = new_doc.get("current_space") or new_doc.get("last_accessed_space_id") or "demo"
     return ProfileResponse(
         username=current_user,
         email=new_doc.get("email"),
@@ -132,5 +152,48 @@ def upload_profile_photo(update: PhotoUpdate, current_user: str = Depends(get_cu
         last_name=new_doc.get("last_name"),
         profile_photo_data_url=new_doc.get("profile_photo_data_url"),
         roles=new_doc.get("roles", []),
-        current_space=new_doc.get("current_space", "demo"),
+        current_space=current_space,
+        last_accessed_space_id=new_doc.get("last_accessed_space_id"),
+    )
+
+
+@router.patch("/preferences", response_model=ProfileResponse)
+def update_preferences(
+    update: PreferencesUpdate, current_user: str = Depends(get_current_username)
+):
+    db = get_db()
+    user_ref = db.collection("users").document(current_user)
+    doc = user_ref.get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    payload = {}
+    if update.last_accessed_space_id is not None:
+        if update.last_accessed_space_id:
+            space_doc = (
+                db.collection("family_spaces")
+                .document(update.last_accessed_space_id)
+                .get()
+            )
+            if not space_doc.exists:
+                raise HTTPException(status_code=404, detail="Family space not found")
+            payload["last_accessed_space_id"] = update.last_accessed_space_id
+            payload["current_space"] = update.last_accessed_space_id
+        else:
+            payload["last_accessed_space_id"] = None
+
+    if payload:
+        user_ref.update(payload)
+
+    new_doc = user_ref.get().to_dict() or {}
+    current_space = new_doc.get("current_space") or new_doc.get("last_accessed_space_id") or "demo"
+    return ProfileResponse(
+        username=current_user,
+        email=new_doc.get("email"),
+        first_name=new_doc.get("first_name"),
+        last_name=new_doc.get("last_name"),
+        profile_photo_data_url=new_doc.get("profile_photo_data_url"),
+        roles=new_doc.get("roles", []),
+        current_space=current_space,
+        last_accessed_space_id=new_doc.get("last_accessed_space_id"),
     )

@@ -14,7 +14,7 @@ interface FamilySpace {
 export default function Login(){
   const [username,setUsername]=useState('');
   const [password,setPassword]=useState('');
-  const [selectedSpace,setSelectedSpace]=useState('demo');
+  const [selectedSpace,setSelectedSpace]=useState('');
   const [availableSpaces,setAvailableSpaces]=useState<FamilySpace[]>([]);
   const [showPass,setShowPass]=useState(false);
   const [remember,setRemember]=useState(true);
@@ -31,6 +31,10 @@ export default function Login(){
         if (response.ok) {
           const spaces = await response.json();
           setAvailableSpaces(spaces);
+          // If there's only one available space, pre-select it to avoid showing an "automatic" placeholder
+          if (Array.isArray(spaces) && spaces.length === 1) {
+            setSelectedSpace(spaces[0].id);
+          }
         }
       } catch (err) {
         console.error('Failed to fetch family spaces:', err);
@@ -47,7 +51,7 @@ export default function Login(){
   }, []);
 
   // Check if form is valid (all required fields filled)
-  const isFormValid = username.trim() !== '' && password.trim() !== '' && selectedSpace.trim() !== '';
+  const isFormValid = username.trim() !== '' && password.trim() !== '';
 
   function getErrorMessage(errorText: string): string {
     // Convert generic error messages to user-friendly ones
@@ -84,16 +88,21 @@ export default function Login(){
     try{
       // Use direct fetch instead of api() to handle eviction errors specifically
       const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8080";
+      const bodyPayload: Record<string, string> = {
+        username,
+        password,
+      };
+
+      if (selectedSpace.trim()) {
+        bodyPayload.space_id = selectedSpace.trim();
+      }
+
       const response = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          username,
-          password,
-          space_id: selectedSpace
-        })
+        body: JSON.stringify(bodyPayload)
       });
 
       if (!response.ok) {
@@ -179,21 +188,49 @@ export default function Login(){
                 )}
               </button>
             </div>
-            <label htmlFor="familySpace">Family Space</label>
-            <select
-              id="familySpace"
-              className="input"
-              value={selectedSpace}
-              onChange={e=>setSelectedSpace(e.target.value)}
-              title="Select your family space"
-            >
-              {availableSpaces.map(space => (
-                <option key={space.id} value={space.id}>
-                  {space.name}
-                  {space.description && ` - ${space.description}`}
-                </option>
-              ))}
-            </select>
+            {/* Only show Family Space dropdown if there are multiple spaces available */}
+            {availableSpaces.length > 1 && (
+              <>
+                <label htmlFor="familySpace">Family Space (optional)</label>
+                <select
+                  id="familySpace"
+                  className="input"
+                  value={selectedSpace}
+                  onChange={e=>setSelectedSpace(e.target.value)}
+                  title="Select your family space"
+                >
+                  {/*
+                    Empty value means: don't send a space_id to the backend and let the server
+                    pick the user's last accessed/current space automatically.
+                  */}
+                  <option value="">Use last accessed space (automatic)</option>
+                  {availableSpaces.map(space => (
+                    <option key={space.id} value={space.id}>
+                      {space.name}
+                      {space.description && ` - ${space.description}`}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+            {/* Show read-only family space name when there's only one space */}
+            {availableSpaces.length === 1 && (
+              <>
+                <label htmlFor="familySpace">Family Space</label>
+                <div
+                  className="input"
+                  style={{
+                    backgroundColor: '#f5f5f5',
+                    color: '#666',
+                    cursor: 'default'
+                  }}
+                  title={`You will log into: ${availableSpaces[0].name}`}
+                >
+                  {availableSpaces[0].name}
+                  {availableSpaces[0].description && ` - ${availableSpaces[0].description}`}
+                </div>
+              </>
+            )}
           <label><input type="checkbox" className="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)}/>Remember me</label>
           <div className="bottombar">
             <div className="bottombar-left">

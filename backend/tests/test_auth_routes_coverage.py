@@ -209,9 +209,12 @@ class TestLogin:
         # Add user with hashed password
         from app.auth_utils import hash_password
 
+        fake_db.collection("family_spaces").document("demo").set({"name": "Demo"})
         fake_db._store["users"]["testuser"] = {
             "email": "test@example.com",
             "password_hash": hash_password("password123"),
+            "current_space": "demo",
+            "last_accessed_space_id": None,
         }
 
         payload = {"username": "testuser", "password": "password123"}
@@ -222,6 +225,41 @@ class TestLogin:
         data = response.json()
         assert "access_token" in data
         assert data["token_type"] == "bearer"
+        assert data["current_space"] == "demo"
+        assert data["last_accessed_space_id"] == "demo"
+
+        doc = fake_db.collection("users").document("testuser").get()
+        saved = doc.to_dict()
+        assert saved["current_space"] == "demo"
+        assert saved["last_accessed_space_id"] == "demo"
+
+    def test_login_with_space_selection_updates_preference(self):
+        client = TestClient(app)
+
+        from app.auth_utils import hash_password
+
+        fake_db.collection("family_spaces").document("demo").set({"name": "Demo"})
+        fake_db.collection("family_spaces").document("karunakaran").set({"name": "Karunakaran"})
+        fake_db._store["users"]["testuser"] = {
+            "email": "test@example.com",
+            "password_hash": hash_password("password123"),
+            "current_space": "demo",
+            "last_accessed_space_id": "demo",
+        }
+
+        payload = {"username": "testuser", "password": "password123", "space_id": "karunakaran"}
+
+        response = client.post("/auth/login", json=payload)
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["current_space"] == "karunakaran"
+        assert data["last_accessed_space_id"] == "karunakaran"
+
+        doc = fake_db.collection("users").document("testuser").get()
+        saved = doc.to_dict()
+        assert saved["current_space"] == "karunakaran"
+        assert saved["last_accessed_space_id"] == "karunakaran"
 
     def test_login_user_not_found(self):
         """Test login with non-existent user."""
