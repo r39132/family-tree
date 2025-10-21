@@ -20,7 +20,9 @@ def get_storage_client() -> Optional[storage.Client]:
     return storage.Client()
 
 
-def upload_profile_picture(file_content: bytes, content_type: str, member_id: str) -> Optional[str]:
+def upload_profile_picture(
+    file_content: bytes, content_type: str, member_id: str, space_id: str = "demo"
+) -> Optional[str]:
     """
     Upload a profile picture to Google Cloud Storage.
 
@@ -28,6 +30,7 @@ def upload_profile_picture(file_content: bytes, content_type: str, member_id: st
         file_content: The image file content as bytes
         content_type: The MIME type of the image
         member_id: The ID of the member this picture belongs to
+        space_id: The family space ID (for organizing storage by space)
 
     Returns:
         A signed URL for the uploaded image (valid for 7 days), or None if upload failed
@@ -62,9 +65,9 @@ def upload_profile_picture(file_content: bytes, content_type: str, member_id: st
         print(f"Error processing image: {e}")
         return None
 
-    # Generate a unique filename
+    # Generate a unique filename organized by space
     file_extension = "jpg"  # Always save as JPEG after optimization
-    filename = f"profile-pictures/{member_id}/{uuid.uuid4()}.{file_extension}"
+    filename = f"{space_id}/profile-pictures/{member_id}/{uuid.uuid4()}.{file_extension}"
 
     try:
         bucket = client.bucket(settings.gcs_bucket_name)
