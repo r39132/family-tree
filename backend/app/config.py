@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     gcs_bucket_name: str = Field(default="", alias="GCS_BUCKET_NAME")
     max_upload_size_mb: int = Field(default=5, alias="MAX_UPLOAD_SIZE_MB")
 
+    # Cloud Storage for family albums
+    album_bucket_name: str = Field(default="", alias="ALBUM_BUCKET_NAME")
+    album_max_upload_size_mb: int = Field(default=5, alias="ALBUM_MAX_UPLOAD_SIZE_MB")
+    album_thumbnail_size: int = Field(default=300, alias="ALBUM_THUMBNAIL_SIZE")
+    cdn_base_url: str = Field(default="", alias="CDN_BASE_URL")
+    signed_url_expiration_days: int = Field(default=7, alias="SIGNED_URL_EXPIRATION_DAYS")
+
     class Config:
         env_file = ".env"
         extra = "ignore"

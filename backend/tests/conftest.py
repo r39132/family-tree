@@ -128,6 +128,8 @@ class FakeDB:
             "tree_state": FakeCollection("tree_state", self),
             "users": FakeCollection("users", self),
             "family_spaces": FakeCollection("family_spaces", self),
+            "album_photos": FakeCollection("album_photos", self),
+            "album_likes": FakeCollection("album_likes", self),
         }
 
     def collection(self, name):
