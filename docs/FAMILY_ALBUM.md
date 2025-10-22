@@ -170,7 +170,7 @@ The following environment variables configure the album feature:
 
 ```bash
 # Album bucket name (required for photo storage)
-ALBUM_BUCKET_NAME=my-project-family-albums
+ALBUM_BUCKET_NAME=my-project-album-photos
 
 # Maximum upload size in MB (default: 10)
 ALBUM_MAX_UPLOAD_SIZE_MB=10

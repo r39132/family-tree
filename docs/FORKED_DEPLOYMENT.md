@@ -41,7 +41,7 @@ GCS_BUCKET_NAME=your-project-id-profile-pictures
 MAX_UPLOAD_SIZE_MB=5  # Optional, defaults to 5MB
 
 # Cloud Storage for family albums
-ALBUM_BUCKET_NAME=your-project-id-family-albums
+ALBUM_BUCKET_NAME=your-project-id-album-photos
 ALBUM_MAX_UPLOAD_SIZE_MB=5  # Optional, defaults to 5MB
 ALBUM_THUMBNAIL_SIZE=300  # Optional, defaults to 300
 SIGNED_URL_EXPIRATION_DAYS=7  # Optional, defaults to 7
@@ -134,7 +134,7 @@ The bootstrap script automatically creates two GCS buckets:
    - Stores user profile pictures
    - Private access with signed URLs
 
-2. **Family Albums Bucket:** `{your-project-id}-family-albums`
+2. **Family Albums Bucket:** `{your-project-id}-album-photos`
    - Stores family album photos and thumbnails
    - Private access with signed URLs or CDN
    - Organized by space: `{space-id}/originals/` and `{space-id}/thumbnails/`
@@ -154,22 +154,22 @@ If you need to create buckets manually or customize settings:
 ```bash
 # Create GCS buckets
 gsutil mb -p your-project-id -l us-central1 gs://your-project-id-profile-pictures
-gsutil mb -p your-project-id -l us-central1 gs://your-project-id-family-albums
+gsutil mb -p your-project-id -l us-central1 gs://your-project-id-album-photos
 
 # Enable uniform bucket-level access (modern IAM approach)
 gsutil uniformbucketlevelaccess set on gs://your-project-id-profile-pictures
-gsutil uniformbucketlevelaccess set on gs://your-project-id-family-albums
+gsutil uniformbucketlevelaccess set on gs://your-project-id-album-photos
 
 # Grant service account storage permissions (replace with your service account email)
 gsutil iam ch serviceAccount:family-tree-runtime@your-project-id.iam.gserviceaccount.com:objectAdmin gs://your-project-id-profile-pictures
-gsutil iam ch serviceAccount:family-tree-runtime@your-project-id.iam.gserviceaccount.com:objectAdmin gs://your-project-id-family-albums
+gsutil iam ch serviceAccount:family-tree-runtime@your-project-id.iam.gserviceaccount.com:objectAdmin gs://your-project-id-album-photos
 ```
 
 **Recommended bucket names:**
 - Profile pictures: `{your-project-id}-profile-pictures`
-- Family albums: `{your-project-id}-family-albums`
+- Family albums: `{your-project-id}-album-photos`
 
-**Example:** `family-tree-469815-profile-pictures` and `family-tree-469815-family-albums`
+**Example:** `family-tree-469815-profile-pictures` and `family-tree-469815-album-photos`
 
 ## Step 4: Initialize Firestore Database
 

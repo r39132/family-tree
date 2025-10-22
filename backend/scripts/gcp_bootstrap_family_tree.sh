@@ -10,7 +10,7 @@ RUNTIME_SA_NAME="${5:-family-tree-runtime}"
 MAKE_DEPLOYER_KEY="${6:-true}"
 KEY_OUTPUT_PATH="${HOME}/${DEPLOYER_SA_NAME}.json"
 GCS_BUCKET_NAME="${PROJECT_ID}-profile-pictures"
-ALBUM_BUCKET_NAME="${PROJECT_ID}-family-albums"
+ALBUM_BUCKET_NAME="${PROJECT_ID}-album-photos"
 
 # Show usage if --help is provided
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
@@ -54,7 +54,7 @@ Environment:
 
 GCS Bucket:
   Profile pictures bucket: \${PROJECT_ID}-profile-pictures
-  Family albums bucket: \${PROJECT_ID}-family-albums
+  Family albums bucket: \${PROJECT_ID}-album-photos
   Location: Same as REGION parameter
   Access: Private (runtime SA has objectAdmin, uses signed URLs for secure access)
 
