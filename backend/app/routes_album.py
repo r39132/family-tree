@@ -2,16 +2,15 @@
 Album routes for family space photo albums.
 """
 
-import base64
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-from .album import delete_album_photo, get_cdn_url, upload_album_photo
+from .album import delete_album_photo, upload_album_photo
 from .config import settings
 from .deps import get_current_username
 from .firestore_client import get_db
-from .models import AlbumLike, AlbumPhoto, AlbumPhotoUpdate, AlbumStats
+from .models import AlbumPhoto, AlbumPhotoUpdate, AlbumStats, BulkPhotoUploadResponse
 from .routes_spaces import get_user_space
 from .utils.time import to_iso_string, utc_now
 
@@ -100,6 +99,114 @@ async def upload_photo(
     photo_ref.set(photo_data)
 
     return AlbumPhoto(id=photo_id, like_count=0, **photo_data)
+
+
+@router.post("/{space_id}/album/photos/bulk", response_model=BulkPhotoUploadResponse)
+async def bulk_upload_photos(
+    space_id: str,
+    files: List[UploadFile] = File(...),
+    current_user: str = Depends(get_current_username),
+):
+    """Upload multiple photos to the album at once."""
+    # Check space access
+    if not check_space_access(current_user, space_id):
+        raise HTTPException(status_code=403, detail="Access denied to this space")
+
+    # Validate file count
+    if len(files) > 50:
+        raise HTTPException(
+            status_code=400, detail="Too many files. Maximum 50 files per bulk upload"
+        )
+
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="No files provided")
+
+    allowed_types = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    max_size = settings.album_max_upload_size_mb * 1024 * 1024
+    db = get_db()
+    now = to_iso_string(utc_now())
+
+    successful_uploads = []
+    failed_uploads = []
+
+    for file in files:
+        try:
+            # Validate file type
+            if file.content_type not in allowed_types:
+                failed_uploads.append(
+                    {
+                        "filename": file.filename or "unknown",
+                        "error": f"Invalid file type: {file.content_type}",
+                    }
+                )
+                continue
+
+            # Read file content
+            file_content = await file.read()
+            file_size = len(file_content)
+
+            # Check file size
+            if file_size > max_size:
+                failed_uploads.append(
+                    {
+                        "filename": file.filename or "unknown",
+                        "error": f"File too large ({file_size} bytes). Max: {max_size} bytes",
+                    }
+                )
+                continue
+
+            # Upload to GCS
+            upload_result = upload_album_photo(file_content, file.content_type, space_id)
+            if not upload_result:
+                failed_uploads.append(
+                    {"filename": file.filename or "unknown", "error": "GCS upload failed"}
+                )
+                continue
+
+            (
+                photo_id,
+                gcs_path,
+                thumbnail_path,
+                cdn_url,
+                thumbnail_cdn_url,
+                width,
+                height,
+            ) = upload_result
+
+            # Save to Firestore
+            photo_data = {
+                "space_id": space_id,
+                "uploader_id": current_user,
+                "filename": file.filename or "unknown",
+                "gcs_path": gcs_path,
+                "thumbnail_path": thumbnail_path,
+                "cdn_url": cdn_url,
+                "thumbnail_cdn_url": thumbnail_cdn_url,
+                "upload_date": now,
+                "file_size": file_size,
+                "width": width,
+                "height": height,
+                "mime_type": file.content_type,
+                "tags": [],
+                "created_at": now,
+                "updated_at": now,
+            }
+
+            photo_ref = db.collection("album_photos").document(photo_id)
+            photo_ref.set(photo_data)
+
+            successful_uploads.append(AlbumPhoto(id=photo_id, like_count=0, **photo_data))
+
+        except Exception as e:
+            failed_uploads.append({"filename": file.filename or "unknown", "error": str(e)})
+
+    return BulkPhotoUploadResponse(
+        total=len(files),
+        successful=len(successful_uploads),
+        failed=len(failed_uploads),
+        photos=successful_uploads,
+        errors=failed_uploads,
+    )
 
 
 @router.get("/{space_id}/album/photos", response_model=List[AlbumPhoto])

@@ -435,3 +435,13 @@ class AlbumStats(BaseModel):
     total_likes: int
     total_uploaders: int
     recent_uploads: int  # Last 7 days
+
+
+class BulkPhotoUploadResponse(BaseModel):
+    """Response model for bulk photo uploads"""
+
+    total: int
+    successful: int
+    failed: int
+    photos: List[AlbumPhoto]
+    errors: List[str]
