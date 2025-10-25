@@ -26,8 +26,8 @@ A full‑stack **Family Tree** application with modern web technologies, designe
 - **Authentication:** Login, register with invite codes, password reset
 - **Family Tree:** Visual tree with CRUD operations, member relationships
 - **Profile Pictures:** Upload and manage member profile pictures with automatic optimization
-- **Family Album:** Photo sharing with likes, tags, bulk upload/delete, and progress tracking
-- **WhatsApp Import:** Import photos from WhatsApp chat exports into album
+- **Family Album:** Photo sharing with likes, tags, bulk upload/delete, progress tracking, and optional CDN support
+- **WhatsApp Import:** Import photos from WhatsApp chat exports into album with duplicate detection
 - **Bulk Upload:** Import multiple family members from JSON files with automatic de-duplication
 - **Map Integration:** Optional Google Maps integration for member locations
 - **Quality Assurance:** Comprehensive testing, linting, and code formatting
@@ -51,6 +51,8 @@ A full‑stack **Family Tree** application with modern web technologies, designe
 #   - JWT_SECRET=your-secret-key
 #   - GCS_BUCKET_NAME=your-bucket-name  # For profile pictures
 #   - ALBUM_BUCKET_NAME=your-album-bucket  # For family album photos
+#   - CDN_BASE_URL=  # Optional - CDN URL for album photos (e.g. https://cdn.example.com)
+#                    # If not set, uses signed URLs with 7-day expiration
 #   - MAX_UPLOAD_SIZE_MB=5  # Optional, defaults to 5MB
 # Create frontend/.env.local with:
 #   - NEXT_PUBLIC_API_BASE=http://localhost:8080
@@ -67,7 +69,32 @@ cd frontend && npm install && npm run dev
 
 **Access:** http://localhost:3000
 
-## 🚀 Deployment
+## � Photo Album & CDN Support
+
+The Family Album feature supports optional CDN configuration for optimized photo delivery:
+
+**Without CDN (Default):**
+- Photos served via signed URLs from Google Cloud Storage
+- 7-day URL expiration (configurable via `SIGNED_URL_EXPIRATION_DAYS`)
+- Suitable for small-to-medium deployments
+- No additional configuration needed
+
+**With CDN (Recommended for Production):**
+- Photos cached at edge locations for faster loading
+- Reduced GCS egress costs
+- Better performance globally
+- Configure via `CDN_BASE_URL` environment variable
+
+**Example CDN setup:**
+```bash
+# Enable Google Cloud CDN for your album bucket
+CDN_BASE_URL=https://cdn.example.com
+SIGNED_URL_EXPIRATION_DAYS=7  # For non-CDN fallback
+```
+
+See [FAMILY_ALBUM.md](docs/FAMILY_ALBUM.md) for full configuration details.
+
+## �🚀 Deployment
 
 **Deploy your own instance:** See [Forked Deployment Guide](docs/FORKED_DEPLOYMENT.md)
 
