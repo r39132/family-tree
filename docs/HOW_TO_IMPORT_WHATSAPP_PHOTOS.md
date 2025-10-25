@@ -20,15 +20,29 @@ This guide walks you through importing photos from a WhatsApp family group chat 
 4. Select "Include Media" (important!)
 5. Choose how to save the export
 
+**On macOS (WhatsApp Desktop):**
+1. Open WhatsApp Desktop app
+2. Click on the family group chat
+3. Click the group name/photo at the top
+4. Click "Export Chat" (or use the three dots menu)
+5. Select "Include Media" (important!)
+6. Choose where to save the export on your Mac
+
 You'll get a ZIP file or folder containing:
 - `_chat.txt` - The chat history
 - Image files like `IMG-20240101-WA0001.jpg`
 
 ### Step 2: Extract the Export
 
-1. Transfer the export to your computer
+1. Transfer the export to your computer (if not already there)
 2. Unzip if it's a ZIP file
-3. Note the folder path (e.g., `/Users/yourname/Downloads/WhatsApp Chat - Family`)
+   - **macOS**: Double-click the ZIP file, or right-click → "Open With" → "Archive Utility"
+   - **Windows**: Right-click → "Extract All"
+   - **Linux**: `unzip filename.zip`
+3. Note the folder path
+   - **macOS example**: `/Users/yourname/Downloads/WhatsApp Chat - Family`
+   - **Windows example**: `C:\Users\yourname\Downloads\WhatsApp Chat - Family`
+   - **Linux example**: `/home/yourname/Downloads/WhatsApp Chat - Family`
 
 ### Step 3: Get Your Space ID
 
@@ -46,8 +60,8 @@ Or ask your admin for the space ID.
 **Option A: From Browser DevTools (Easy)**
 1. Log into Family Tree in your browser
 2. Open DevTools (F12 or right-click → Inspect)
-3. Go to Application/Storage → Cookies
-4. Find the `access_token` cookie and copy its value
+3. Go to **Application** tab → **Local Storage** → Select your site URL
+4. Find the `token` key and copy its value
 
 **Option B: From Login API**
 ```bash
@@ -59,6 +73,7 @@ curl -X POST http://localhost:8000/auth/login \
 
 ### Step 5: Run the Import Script
 
+**On macOS/Linux:**
 ```bash
 cd backend/scripts
 
@@ -66,6 +81,28 @@ cd backend/scripts
 python import_whatsapp_photos.py \
   --export-folder "/Users/yourname/Downloads/WhatsApp Chat - Family" \
   --space-id karunakaran \
+  --token "your_access_token_here"
+```
+
+**On Windows (PowerShell):**
+```powershell
+cd backend\scripts
+
+# Basic import (uses sender names as-is)
+python import_whatsapp_photos.py `
+  --export-folder "C:\Users\yourname\Downloads\WhatsApp Chat - Family" `
+  --space-id karunakaran `
+  --token "your_access_token_here"
+```
+
+**On Windows (Command Prompt):**
+```cmd
+cd backend\scripts
+
+rem Basic import (uses sender names as-is)
+python import_whatsapp_photos.py ^
+  --export-folder "C:\Users\yourname\Downloads\WhatsApp Chat - Family" ^
+  --space-id karunakaran ^
   --token "your_access_token_here"
 ```
 
@@ -123,11 +160,21 @@ This shows you all the sender names found in the chat, then you can map them.
 
 ### 2. Run Import with Mapping
 
+**On macOS/Linux:**
 ```bash
 python import_whatsapp_photos.py \
   --export-folder "/Users/yourname/Downloads/WhatsApp Chat - Family" \
   --space-id karunakaran \
   --mapping-file phone_mapping.json \
+  --token "your_access_token_here"
+```
+
+**On Windows:**
+```powershell
+python import_whatsapp_photos.py `
+  --export-folder "C:\Users\yourname\Downloads\WhatsApp Chat - Family" `
+  --space-id karunakaran `
+  --mapping-file phone_mapping.json `
   --token "your_access_token_here"
 ```
 
@@ -155,8 +202,10 @@ This will show you:
 
 Here's a real-world example:
 
+**On macOS:**
 ```bash
 # 1. Export WhatsApp chat from phone to Downloads/WhatsApp Chat - Family Group
+#    Or export directly from WhatsApp Desktop on Mac
 
 # 2. Create phone mapping
 cat > phone_mapping.json << 'EOF'
@@ -181,8 +230,39 @@ python import_whatsapp_photos.py \
   --space-id karunakaran \
   --mapping-file phone_mapping.json \
   --token "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
 
-# Output:
+**On Windows (PowerShell):**
+```powershell
+# 1. Export WhatsApp chat from phone to Downloads\WhatsApp Chat - Family Group
+
+# 2. Create phone mapping
+@"
+{
+  "Siddharth Anand": "orTx8ZIGCxDYnB81uXKS",
+  "Dad": "member_id_dad",
+  "Mom": "member_id_mom",
+  "+919876543210": "member_id_brother"
+}
+"@ | Out-File phone_mapping.json
+
+# 3. Test with dry-run
+python import_whatsapp_photos.py `
+  --export-folder "$env:USERPROFILE\Downloads\WhatsApp Chat - Family Group" `
+  --space-id karunakaran `
+  --mapping-file phone_mapping.json `
+  --dry-run
+
+# 4. Import for real
+python import_whatsapp_photos.py `
+  --export-folder "$env:USERPROFILE\Downloads\WhatsApp Chat - Family Group" `
+  --space-id karunakaran `
+  --mapping-file phone_mapping.json `
+  --token "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+**Expected Output:**
+```
 # Parsing WhatsApp chat export from: /Users/.../WhatsApp Chat - Family Group
 # Found 127 photo messages in chat export
 # Found 124 photo files in export folder
@@ -283,6 +363,7 @@ For each photo, the script preserves:
 
 **Import WhatsApp photos in 3 commands:**
 
+**macOS/Linux:**
 ```bash
 # 1. Export chat from WhatsApp (with media)
 
@@ -296,6 +377,23 @@ python import_whatsapp_photos.py \
 python import_whatsapp_photos.py \
   --export-folder "/path/to/WhatsApp Chat - Family" \
   --space-id your_space_id \
+  --token your_access_token
+```
+
+**Windows:**
+```powershell
+# 1. Export chat from WhatsApp (with media)
+
+# 2. Test the import
+python import_whatsapp_photos.py `
+  --export-folder "C:\path\to\WhatsApp Chat - Family" `
+  --space-id your_space_id `
+  --dry-run
+
+# 3. Import for real
+python import_whatsapp_photos.py `
+  --export-folder "C:\path\to\WhatsApp Chat - Family" `
+  --space-id your_space_id `
   --token your_access_token
 ```
 
