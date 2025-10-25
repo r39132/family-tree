@@ -199,6 +199,7 @@ export default function TopNav({ showBack=true, showAdd=true, showInvite=true, s
               </>
             )}
             <Link className="btn secondary" href="/events">Events</Link>
+            <Link className="btn secondary" href="/album">Album</Link>
             {config.enable_map && <Link className="btn secondary" href="/map">Map</Link>}
           </>
         )}

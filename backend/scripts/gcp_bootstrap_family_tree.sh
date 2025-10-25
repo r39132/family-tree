@@ -10,6 +10,7 @@ RUNTIME_SA_NAME="${5:-family-tree-runtime}"
 MAKE_DEPLOYER_KEY="${6:-true}"
 KEY_OUTPUT_PATH="${HOME}/${DEPLOYER_SA_NAME}.json"
 GCS_BUCKET_NAME="${PROJECT_ID}-profile-pictures"
+ALBUM_BUCKET_NAME="${PROJECT_ID}-album-photos"
 
 # Show usage if --help is provided
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
@@ -23,6 +24,7 @@ This script sets up:
 - Service accounts for deployment and runtime
 - IAM bindings and permissions
 - GCS bucket for profile pictures with private access (signed URLs)
+- GCS bucket for family albums with private access (signed URLs + CDN support)
 - Uniform bucket-level access for modern IAM
 
 Arguments (all optional, defaults shown):
@@ -51,7 +53,8 @@ Environment:
   Permissions: Project Owner or equivalent to create service accounts and set IAM policies
 
 GCS Bucket:
-  Bucket name will be: \${PROJECT_ID}-profile-pictures
+  Profile pictures bucket: \${PROJECT_ID}-profile-pictures
+  Family albums bucket: \${PROJECT_ID}-album-photos
   Location: Same as REGION parameter
   Access: Private (runtime SA has objectAdmin, uses signed URLs for secure access)
 
@@ -206,7 +209,29 @@ main() {
 
   ok "GCS bucket configured for profile pictures (private access only)"
 
-  # 6) (Optional) Create deployer key for GitHub Actions
+  # 6) Create GCS bucket for family albums
+  note "Setting up GCS bucket for family albums: ${ALBUM_BUCKET_NAME}"
+
+  # Check if bucket exists
+  if gsutil ls -b "gs://${ALBUM_BUCKET_NAME}" >/dev/null 2>&1; then
+    note "Bucket already exists: gs://${ALBUM_BUCKET_NAME}"
+  else
+    note "Creating bucket: gs://${ALBUM_BUCKET_NAME}"
+    gsutil mb -p "${PROJECT_ID}" -l "${REGION}" "gs://${ALBUM_BUCKET_NAME}"
+    ok "Bucket created: gs://${ALBUM_BUCKET_NAME}"
+  fi
+
+  # Enable uniform bucket-level access
+  note "Enabling uniform bucket-level access for album bucket"
+  gsutil uniformbucketlevelaccess set on "gs://${ALBUM_BUCKET_NAME}" 2>/dev/null || true
+
+  # Grant runtime service account storage permissions
+  note "Granting runtime SA storage permissions for album bucket"
+  gsutil iam ch "serviceAccount:${RUNTIME_SA_EMAIL}:objectAdmin" "gs://${ALBUM_BUCKET_NAME}"
+
+  ok "GCS bucket configured for family albums (private access only)"
+
+  # 7) (Optional) Create deployer key for GitHub Actions
   maybe_make_key "$DEPLOYER_SA_EMAIL" "$KEY_OUTPUT_PATH"
 
   bold "Done."
@@ -221,18 +246,25 @@ main() {
    - Create secret  CLOUD_RUN_SERVICE       = family-tree-api
    - (Optional) CLOUD_RUN_RUNTIME_SA        = ${RUNTIME_SA_EMAIL}
 
-2) Update your .env file with the GCS bucket name:
+2) Update your .env file with the GCS bucket names:
    GCS_BUCKET_NAME=${GCS_BUCKET_NAME}
+   ALBUM_BUCKET_NAME=${ALBUM_BUCKET_NAME}
    MAX_UPLOAD_SIZE_MB=5
+   ALBUM_MAX_UPLOAD_SIZE_MB=5
 
-3) In your deploy step, specify the runtime SA and GCS bucket:
+3) In your deploy step, specify the runtime SA and GCS buckets:
    gcloud run deploy \${{ secrets.CLOUD_RUN_SERVICE }} \\
      --image "\$IMAGE" \\
      --region \${{ secrets.CLOUD_RUN_REGION }} \\
      --platform managed \\
      --service-account ${RUNTIME_SA_EMAIL} \\
      --allow-unauthenticated \\
-     --set-env-vars "GOOGLE_CLOUD_PROJECT=\${{ secrets.GCP_PROJECT_ID }},FIRESTORE_DATABASE=family-tree,GCS_BUCKET_NAME=${GCS_BUCKET_NAME},MAX_UPLOAD_SIZE_MB=5"
+     --set-env-vars "GOOGLE_CLOUD_PROJECT=\${{ secrets.GCP_PROJECT_ID }}" \\
+     --set-env-vars "FIRESTORE_DATABASE=family-tree" \\
+     --set-env-vars "GCS_BUCKET_NAME=${GCS_BUCKET_NAME}" \\
+     --set-env-vars "ALBUM_BUCKET_NAME=${ALBUM_BUCKET_NAME}" \\
+     --set-env-vars "MAX_UPLOAD_SIZE_MB=5" \\
+     --set-env-vars "ALBUM_MAX_UPLOAD_SIZE_MB=5"
 
 3) If you prefer uploading the key with GitHub CLI:
    base64 -w0 "${KEY_OUTPUT_PATH}" | gh secret set GCP_SA_KEY

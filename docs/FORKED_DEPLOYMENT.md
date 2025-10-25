@@ -40,6 +40,12 @@ JWT_SECRET=your-unique-secret-key-min-32-chars
 GCS_BUCKET_NAME=your-project-id-profile-pictures
 MAX_UPLOAD_SIZE_MB=5  # Optional, defaults to 5MB
 
+# Cloud Storage for family albums
+ALBUM_BUCKET_NAME=your-project-id-album-photos
+ALBUM_MAX_UPLOAD_SIZE_MB=5  # Optional, defaults to 5MB
+ALBUM_THUMBNAIL_SIZE=300  # Optional, defaults to 300
+SIGNED_URL_EXPIRATION_DAYS=7  # Optional, defaults to 7
+
 # Optional: Google Maps integration
 ENABLE_MAP=true
 GOOGLE_MAPS_API_KEY=your-maps-api-key
@@ -93,9 +99,10 @@ cd backend/scripts
 ### What This Script Does
 
 The bootstrap script will:
-- ✅ Enable required GCP APIs (Cloud Run, Artifact Registry)
+- ✅ Enable required GCP APIs (Cloud Run, Artifact Registry, Cloud Storage)
 - ✅ Create service accounts for deployment and runtime
 - ✅ Set up IAM permissions
+- ✅ Create GCS buckets for profile pictures and family albums
 - ✅ Generate deployment keys for GitHub Actions
 - ✅ Provide instructions for GitHub secrets setup
 
@@ -119,28 +126,50 @@ The script will output:
 
 **Save this output!** You'll need it for Step 7.
 
-### Create Cloud Storage Bucket (for Profile Pictures)
+### GCS Buckets Created
+
+The bootstrap script automatically creates two GCS buckets:
+
+1. **Profile Pictures Bucket:** `{your-project-id}-profile-pictures`
+   - Stores user profile pictures
+   - Private access with signed URLs
+
+2. **Family Albums Bucket:** `{your-project-id}-album-photos`
+   - Stores family album photos and thumbnails
+   - Private access with signed URLs or CDN
+   - Organized by space: `{space-id}/originals/` and `{space-id}/thumbnails/`
+
+**Security:**
+- ⚠️ **No public access** - Buckets remain private
+- ✅ **Signed URLs** - Images accessed via time-limited signed URLs (7 days)
+- ✅ **Service account only** - Only your runtime service account has access
+- ✅ **CDN Support** - Optional CDN configuration for faster photo loading
+
+**Note:** These bucket names should match the `GCS_BUCKET_NAME` and `ALBUM_BUCKET_NAME` values in your `backend/.env` file.
+
+### Manual Bucket Creation (Optional)
+
+If you need to create buckets manually or customize settings:
 
 ```bash
-# Create a GCS bucket for storing profile pictures
+# Create GCS buckets
 gsutil mb -p your-project-id -l us-central1 gs://your-project-id-profile-pictures
+gsutil mb -p your-project-id -l us-central1 gs://your-project-id-album-photos
 
 # Enable uniform bucket-level access (modern IAM approach)
 gsutil uniformbucketlevelaccess set on gs://your-project-id-profile-pictures
+gsutil uniformbucketlevelaccess set on gs://your-project-id-album-photos
 
 # Grant service account storage permissions (replace with your service account email)
 gsutil iam ch serviceAccount:family-tree-runtime@your-project-id.iam.gserviceaccount.com:objectAdmin gs://your-project-id-profile-pictures
+gsutil iam ch serviceAccount:family-tree-runtime@your-project-id.iam.gserviceaccount.com:objectAdmin gs://your-project-id-album-photos
 ```
 
-**Recommended bucket name:** `{your-project-id}-profile-pictures`
-**Example:** `family-tree-469815-profile-pictures`
+**Recommended bucket names:**
+- Profile pictures: `{your-project-id}-profile-pictures`
+- Family albums: `{your-project-id}-album-photos`
 
-**Security Note:**
-- ⚠️ **No public access** - Bucket remains private
-- ✅ **Signed URLs** - Images accessed via time-limited signed URLs (7 days)
-- ✅ **Service account only** - Only your runtime service account has access
-
-**Note:** This bucket name should match the `GCS_BUCKET_NAME` value in your `backend/.env` file.
+**Example:** `family-tree-469815-profile-pictures` and `family-tree-469815-album-photos`
 
 ## Step 4: Initialize Firestore Database
 

@@ -14,6 +14,8 @@ Comprehensive documentation for utility scripts in `backend/scripts/`. These scr
 | `initialize_collections.py` | 📦 Setup | Create Firestore collections | ✅ Required (first setup) |
 | `seed_admin.py` | 👤 Setup | Create admin account | ✅ Required |
 | `populate_dummy_data.py` | 🧪 Testing | Create test family tree data | ⚠️ Optional (development) |
+| `seed_demo_album.py` | 🧪 Testing | Seed album with test photos | ⚠️ Optional (development) |
+| `import_whatsapp_photos.py` | 📸 Utility | Import WhatsApp photos to album | ⚠️ Optional (production) |
 | `create_user_account.py` | 👥 Utility | Create user accounts | ⚠️ Optional (multi-user) |
 
 ---
@@ -225,6 +227,103 @@ Grandchildren:
    ├─ Ashley Smith (10/14/1992)
    └─ Tyler Smith (03/07/1996)
 ```
+
+---
+
+### `seed_demo_album.py`
+
+**Category:** Testing
+**Required:** ⚠️ Optional (development/testing only)
+
+**Purpose:** Seeds the album with test photos for development and testing.
+
+**Usage:**
+```bash
+# Seed album with test photos
+uv run python scripts/seed_demo_album.py --space-id karunakaran
+```
+
+**What it does:**
+1. Downloads sample photos from placeholder image services
+2. Uploads them to the specified space's album
+3. Creates test photo entries with sample captions and metadata
+
+**Safety Notes:**
+- ⚠️ Downloads external images from the internet
+- ✅ For development/testing purposes only
+- See `import_whatsapp_photos.py` for production WhatsApp photo imports
+
+---
+
+### `import_whatsapp_photos.py`
+
+**Category:** Utility
+**Required:** ⚠️ Optional (for importing real photos)
+
+**Purpose:** Imports photos from WhatsApp chat exports into the Family Tree album.
+
+**Usage:**
+```bash
+# Basic import
+uv run python scripts/import_whatsapp_photos.py \
+  --export-folder /path/to/whatsapp/export \
+  --space-id karunakaran \
+  --token YOUR_AUTH_TOKEN
+
+# With phone number mapping
+uv run python scripts/import_whatsapp_photos.py \
+  --export-folder /path/to/whatsapp/export \
+  --space-id karunakaran \
+  --mapping-file phone_mapping.json \
+  --token YOUR_AUTH_TOKEN
+
+# Dry run to test without uploading
+uv run python scripts/import_whatsapp_photos.py \
+  --export-folder /path/to/whatsapp/export \
+  --space-id karunakaran \
+  --dry-run
+```
+
+**What it does:**
+1. Parses WhatsApp chat export `_chat.txt` file
+2. Extracts photo messages with metadata (date, time, sender, caption)
+3. Matches photo filenames with actual files in export folder
+4. Maps WhatsApp senders to Family Tree user IDs (if mapping provided)
+5. Uploads photos in bulk using the album API endpoint
+6. Preserves original captions and metadata
+
+**Arguments:**
+- `--export-folder` - Path to WhatsApp chat export folder (required)
+- `--space-id` - Space ID to upload photos to (required)
+- `--mapping-file` - JSON file mapping phone numbers to user IDs (optional)
+- `--api-url` - Backend API base URL (default: `http://localhost:8000`)
+- `--token` - Auth token (or use `AUTH_TOKEN` env var)
+- `--dry-run` - Parse and prepare but don't upload
+
+**Phone Mapping File:**
+Create a JSON file mapping WhatsApp sender names/numbers to member IDs:
+```json
+{
+  "Siddharth Anand": "orTx8ZIGCxDYnB81uXKS",
+  "+919876543210": "member_id_relative1",
+  "Mom": "member_id_mom"
+}
+```
+
+**Safety Notes:**
+- ✅ Designed for production use with real WhatsApp exports
+- ✅ Dry-run mode for testing before actual upload
+- ✅ Preserves original metadata from WhatsApp messages
+- ⚠️ Requires valid authentication token
+- ⚠️ Photos must meet backend size limits (default: 10MB)
+
+**Dependencies:**
+- `requests` - HTTP client for API calls
+- `python-dotenv` - Environment variable management
+
+**See Also:**
+- Complete documentation: [WHATSAPP_IMPORT.md](WHATSAPP_IMPORT.md)
+- Example phone mapping file: `scripts/phone_mapping.example.json`
 
 ---
 

@@ -379,3 +379,85 @@ class BulkUploadResponse(BaseModel):
     already_present_count: int
     errors: List[str] = Field(default_factory=list)
     message: Optional[str] = None
+
+
+# Album models
+class AlbumPhoto(BaseModel):
+    """Model for album photo"""
+
+    id: str
+    space_id: str
+    uploader_id: str
+    filename: str
+    gcs_path: str
+    thumbnail_path: str
+    cdn_url: str
+    thumbnail_cdn_url: str
+    upload_date: str
+    file_size: int
+    width: int
+    height: int
+    mime_type: str
+    tags: List[str] = Field(default_factory=list)
+    like_count: int = 0
+    created_at: str
+    updated_at: str
+
+
+class AlbumPhotoUpload(BaseModel):
+    """Model for album photo upload request"""
+
+    filename: str
+    content_type: str
+    file_size: int
+
+
+class AlbumPhotoUpdate(BaseModel):
+    """Model for album photo update (tags)"""
+
+    tags: List[str]
+
+
+class AlbumLike(BaseModel):
+    """Model for album like"""
+
+    id: str
+    photo_id: str
+    user_id: str
+    space_id: str
+    created_at: str
+
+
+class AlbumStats(BaseModel):
+    """Model for album statistics"""
+
+    total_photos: int
+    total_likes: int
+    total_uploaders: int
+    recent_uploads: int  # Last 7 days
+
+
+class BulkPhotoUploadResponse(BaseModel):
+    """Response model for bulk photo uploads"""
+
+    total: int
+    successful: int
+    failed: int
+    photos: List[AlbumPhoto]
+    errors: List[str]
+
+
+class BulkPhotoDeleteRequest(BaseModel):
+    """Request model for bulk photo deletion"""
+
+    photo_ids: List[str]
+
+
+class BulkPhotoDeleteResponse(BaseModel):
+    """Response model for bulk photo deletion"""
+
+    total: int
+    successful: int
+    failed: int
+    deleted_ids: List[str]
+    errors: List[dict]

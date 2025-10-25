@@ -791,8 +791,8 @@ async def upload_member_picture(
             detail=f"File too large. Maximum size: {settings.max_upload_size_mb}MB",
         )
 
-    # Upload to Cloud Storage
-    public_url = upload_profile_picture(file_content, file.content_type, member_id)
+    # Upload to Cloud Storage (organized by space)
+    public_url = upload_profile_picture(file_content, file.content_type, member_id, space_id)
 
     if not public_url:
         raise HTTPException(
