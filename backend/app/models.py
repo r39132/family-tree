@@ -445,3 +445,19 @@ class BulkPhotoUploadResponse(BaseModel):
     failed: int
     photos: List[AlbumPhoto]
     errors: List[str]
+
+
+class BulkPhotoDeleteRequest(BaseModel):
+    """Request model for bulk photo deletion"""
+
+    photo_ids: List[str]
+
+
+class BulkPhotoDeleteResponse(BaseModel):
+    """Response model for bulk photo deletion"""
+
+    total: int
+    successful: int
+    failed: int
+    deleted_ids: List[str]
+    errors: List[dict]

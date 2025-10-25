@@ -44,22 +44,63 @@ def upload_photos(
         print("❌ No photos found to upload")
         return
 
-    print(f"📸 Found {len(photo_files)} photos to upload")
+    print(f"📸 Found {len(photo_files)} photos in export folder")
+
+    # Fetch existing photos to check for duplicates
+    print("🔍 Checking for existing photos in album...")
+    try:
+        url = f"{api_url}/spaces/{space_id}/album/photos"
+        headers = {"Authorization": f"Bearer {token}"}
+        response = requests.get(url, headers=headers, params={"limit": 1000}, timeout=30)
+        response.raise_for_status()
+        existing_photos = response.json()
+        existing_filenames = {photo["filename"] for photo in existing_photos}
+        print(f"   Found {len(existing_filenames)} existing photos")
+    except requests.exceptions.RequestException as e:
+        print(f"⚠️  Warning: Could not fetch existing photos: {e}")
+        print("   Proceeding without duplicate detection...")
+        existing_filenames = set()
+
+    # Filter out duplicates
+    photos_to_upload = []
+    skipped_duplicates = []
+
+    for photo in photo_files:
+        if photo.name in existing_filenames:
+            skipped_duplicates.append(photo.name)
+        else:
+            photos_to_upload.append(photo)
+
+    print("\n📊 Upload Summary:")
+    print(f"   Total photos in folder: {len(photo_files)}")
+    print(f"   Already uploaded (skipped): {len(skipped_duplicates)}")
+    print(f"   New photos to upload: {len(photos_to_upload)}")
+
+    if skipped_duplicates:
+        print("\n⏭️  Skipping duplicates:")
+        for filename in skipped_duplicates[:10]:  # Show first 10
+            print(f"   - {filename}")
+        if len(skipped_duplicates) > 10:
+            print(f"   ... and {len(skipped_duplicates) - 10} more")
+
+    if not photos_to_upload:
+        print("\n✅ All photos already uploaded. Nothing to do!")
+        return
 
     if dry_run:
         print("\n🔍 DRY RUN MODE - No uploads will be performed")
         print("\nPhotos that would be uploaded:")
-        for i, photo in enumerate(photo_files, 1):
+        for i, photo in enumerate(photos_to_upload, 1):
             print(f"  {i}. {photo.name} ({photo.stat().st_size / 1024:.1f} KB)")
         return
 
     # Prepare files for upload
-    print("\n📤 Uploading photos...")
+    print(f"\n📤 Uploading {len(photos_to_upload)} new photos...")
     files = []
     file_handles = []
 
     try:
-        for photo in photo_files:
+        for photo in photos_to_upload:
             fh = open(photo, "rb")
             file_handles.append(fh)
             files.append(("files", (photo.name, fh, "image/jpeg")))

@@ -10,7 +10,14 @@ from .album import delete_album_photo, upload_album_photo
 from .config import settings
 from .deps import get_current_username
 from .firestore_client import get_db
-from .models import AlbumPhoto, AlbumPhotoUpdate, AlbumStats, BulkPhotoUploadResponse
+from .models import (
+    AlbumPhoto,
+    AlbumPhotoUpdate,
+    AlbumStats,
+    BulkPhotoDeleteRequest,
+    BulkPhotoDeleteResponse,
+    BulkPhotoUploadResponse,
+)
 from .routes_spaces import get_user_space
 from .utils.time import to_iso_string, utc_now
 
@@ -355,6 +362,80 @@ def delete_photo(
     photo_ref.delete()
 
     return {"message": "Photo deleted successfully"}
+
+
+@router.post("/{space_id}/album/photos/bulk-delete", response_model=BulkPhotoDeleteResponse)
+def bulk_delete_photos(
+    space_id: str,
+    delete_request: BulkPhotoDeleteRequest,
+    current_user: str = Depends(get_current_username),
+):
+    """Delete multiple photos at once (uploader or admin only)."""
+    # Check space access
+    if not check_space_access(current_user, space_id):
+        raise HTTPException(status_code=403, detail="Access denied to this space")
+
+    if not delete_request.photo_ids:
+        raise HTTPException(status_code=400, detail="No photo IDs provided")
+
+    if len(delete_request.photo_ids) > 100:
+        raise HTTPException(status_code=400, detail="Too many photos. Maximum 100 per bulk delete")
+
+    db = get_db()
+    deleted_ids = []
+    errors = []
+
+    for photo_id in delete_request.photo_ids:
+        try:
+            # Check if user is uploader
+            if not is_photo_uploader(current_user, photo_id, space_id):
+                errors.append(
+                    {"photo_id": photo_id, "error": "Only the uploader can delete this photo"}
+                )
+                continue
+
+            photo_ref = db.collection("album_photos").document(photo_id)
+            photo_doc = photo_ref.get()
+
+            if not photo_doc.exists:
+                errors.append({"photo_id": photo_id, "error": "Photo not found"})
+                continue
+
+            photo_data = photo_doc.to_dict()
+
+            # Verify photo belongs to this space
+            if photo_data.get("space_id") != space_id:
+                errors.append({"photo_id": photo_id, "error": "Photo not found in this space"})
+                continue
+
+            # Delete from GCS
+            try:
+                delete_album_photo(
+                    photo_data.get("gcs_path", ""), photo_data.get("thumbnail_path", "")
+                )
+            except Exception as e:
+                # Log but don't fail the deletion if GCS delete fails
+                print(f"Warning: Failed to delete GCS files for photo {photo_id}: {e}")
+
+            # Delete likes
+            likes_query = db.collection("album_likes").where("photo_id", "==", photo_id)
+            for like_doc in likes_query.stream():
+                like_doc.reference.delete()
+
+            # Delete photo document
+            photo_ref.delete()
+            deleted_ids.append(photo_id)
+
+        except Exception as e:
+            errors.append({"photo_id": photo_id, "error": str(e)})
+
+    return BulkPhotoDeleteResponse(
+        total=len(delete_request.photo_ids),
+        successful=len(deleted_ids),
+        failed=len(errors),
+        deleted_ids=deleted_ids,
+        errors=errors,
+    )
 
 
 @router.post("/{space_id}/album/photos/{photo_id}/like")

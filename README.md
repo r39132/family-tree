@@ -26,6 +26,8 @@ A full‑stack **Family Tree** application with modern web technologies, designe
 - **Authentication:** Login, register with invite codes, password reset
 - **Family Tree:** Visual tree with CRUD operations, member relationships
 - **Profile Pictures:** Upload and manage member profile pictures with automatic optimization
+- **Family Album:** Photo sharing with likes, tags, bulk upload/delete, and progress tracking
+- **WhatsApp Import:** Import photos from WhatsApp chat exports into album
 - **Bulk Upload:** Import multiple family members from JSON files with automatic de-duplication
 - **Map Integration:** Optional Google Maps integration for member locations
 - **Quality Assurance:** Comprehensive testing, linting, and code formatting
@@ -48,6 +50,7 @@ A full‑stack **Family Tree** application with modern web technologies, designe
 #   - FIRESTORE_DATABASE=family-tree
 #   - JWT_SECRET=your-secret-key
 #   - GCS_BUCKET_NAME=your-bucket-name  # For profile pictures
+#   - ALBUM_BUCKET_NAME=your-album-bucket  # For family album photos
 #   - MAX_UPLOAD_SIZE_MB=5  # Optional, defaults to 5MB
 # Create frontend/.env.local with:
 #   - NEXT_PUBLIC_API_BASE=http://localhost:8080
@@ -97,6 +100,8 @@ pre-commit run --all-files
 ## Documentation
 
 - **[Architecture Overview](docs/ARCHITECTURE.md)** - Technical architecture, data flow, and sequence diagrams
+- **[Family Album](docs/FAMILY_ALBUM.md)** - Photo sharing feature with likes, tags, and filtering
+- **[WhatsApp Import](docs/WHATSAPP_IMPORT.md)** - Import photos from WhatsApp chat exports
 - **[Screenshots](docs/SCREENSHOTS.md)** - Application screenshots and UI examples
 - **[Bulk Upload Guide](docs/BULK_UPLOAD.md)** - Instructions for bulk uploading family members from JSON files
 - **[Deployment Guide](docs/DEPLOYMENT.md)** - CI/CD setup, Docker configuration, and cloud deployment

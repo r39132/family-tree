@@ -1,104 +1,109 @@
 # WhatsApp Photo Import
 
-The `import_whatsapp_photos.py` script imports photos from a WhatsApp chat export into the Family Tree album.
+Import photos from WhatsApp chat exports into your Family Tree album.
 
-## Overview
+## Quick Start
 
-This script:
-- Parses WhatsApp chat export `_chat.txt` file to extract photo messages
-- Matches photo filenames with actual files in the export folder
-- Maps WhatsApp senders to Family Tree user IDs
-- Uploads photos in bulk using the album API endpoint
-- Preserves captions and metadata from the original messages
+### 1. Export WhatsApp Chat
 
-## Prerequisites
+**iPhone/Android/Desktop**: Open chat → Export Chat → **Include Media**
 
-1. **WhatsApp Chat Export**: Export a WhatsApp group chat with media included
-2. **Backend Server**: Running backend API (local or remote)
-3. **Authentication**: Valid auth token for the API
-4. **Python Packages**: `requests`, `python-dotenv` (already in project requirements)
+You'll get a ZIP file containing `_chat.txt` and image files.
 
-## WhatsApp Export Format
+### 2. Extract & Note Path
 
-WhatsApp exports chats in the following format:
+Unzip the export and note the folder path:
+- macOS: `/Users/yourname/Downloads/WhatsApp Chat - Family`
+- Windows: `C:\Users\yourname\Downloads\WhatsApp Chat - Family`
 
-```
-WhatsApp Chat Export/
-├── _chat.txt           # Chat history with timestamps and senders
-├── IMG-20240101-WA0001.jpg
-├── IMG-20240101-WA0002.jpg
-└── ...
+### 3. Get Auth Token
+
+Open browser DevTools (F12) → Application → Local Storage → copy `token` value
+
+Or via API:
+```bash
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"user","password":"pass"}' | jq -r '.access_token'
 ```
 
-The `_chat.txt` file contains messages like:
-```
-[1/15/24, 3:45 PM] John Doe: IMG-20240101-WA0001.jpg
-[1/15/24, 3:46 PM] Jane Smith: Check out this photo!
-[1/15/24, 4:20 PM] John Doe: IMG-20240101-WA0002.jpg Family gathering 2024
-```
-
-## Usage
-
-### Basic Usage
+### 4. Run Import
 
 ```bash
 cd backend/scripts
+
 python import_whatsapp_photos.py \
-  --export-folder /path/to/whatsapp/export \
-  --space-id karunakaran \
-  --token YOUR_AUTH_TOKEN
+  --export-folder "/path/to/WhatsApp Chat - Family" \
+  --space-id your_space_id \
+  --token "your_token_here"
 ```
 
-### With Phone Mapping
+**Windows PowerShell**: Use backticks `` ` `` for line continuation
+**Windows CMD**: Put all on one line
 
-Create a JSON file mapping WhatsApp sender names/numbers to Family Tree member IDs:
+## Features
 
-```json
-{
-  "John Doe": "member_id_abc123",
-  "+1234567890": "member_id_xyz789",
-  "Mom": "member_id_mom001"
-}
+- ✅ **Duplicate Detection**: Skips already-uploaded photos (by filename)
+- ✅ **Bulk Upload**: Uploads all photos via bulk endpoint
+- ✅ **Progress Tracking**: Shows upload progress and summary
+- ✅ **Dry Run**: Test without uploading (`--dry-run` flag)
+- ✅ **Error Handling**: Continues on errors, reports failures
+
+## Command-Line Options
+
+| Option | Required | Description |
+|--------|----------|-------------|
+| `--export-folder` | Yes | Path to WhatsApp export folder |
+| `--space-id` | Yes | Family space ID |
+| `--token` | Yes* | Auth token (*or set in `.env`) |
+| `--api-url` | No | API base URL (default: `http://localhost:8080`) |
+| `--dry-run` | No | Test mode, no uploads |
+
+## Example Output
+
+```
+📸 Scanning for photos in: /Users/me/WAK
+📸 Found 12 photos in export folder
+🔍 Checking for existing photos in album...
+   Found 9 existing photos
+
+📊 Upload Summary:
+   Total photos in folder: 12
+   Already uploaded (skipped): 9
+   New photos to upload: 3
+
+⏭️  Skipping duplicates:
+   - IMG-20251019-WA0010.jpg
+   - IMG-20251019-WA0011.jpg
+   ...
+
+📤 Uploading 3 new photos...
+✅ Upload complete!
+   Total: 3
+   Successful: 3
+   Failed: 0
+
+🎉 Successfully imported 3 photos!
 ```
 
-Then run:
+## Troubleshooting
 
-```bash
-python import_whatsapp_photos.py \
-  --export-folder /path/to/whatsapp/export \
-  --space-id karunakaran \
-  --mapping-file phone_mapping.json \
-  --token YOUR_AUTH_TOKEN
-```
+- **"No photos found"**: Ensure export folder contains `.jpg`/`.jpeg` files
+- **"401 Unauthorized"**: Token expired, get a fresh one
+- **"Connection refused"**: Backend not running or wrong API URL
+- **"Access denied"**: Check you have permission for the space
 
-### Dry Run (Test Without Uploading)
+## Technical Details
 
-```bash
-python import_whatsapp_photos.py \
-  --export-folder /path/to/whatsapp/export \
-  --space-id karunakaran \
-  --dry-run
-```
+**What it does**:
+1. Scans export folder for all `.jpg` and `.jpeg` files
+2. Fetches existing photos from album API
+3. Compares filenames to identify duplicates
+4. Uploads only new photos via bulk endpoint
+5. Reports results (success/failure counts)
 
-### Using Environment Variables
-
-Set your auth token in `.env`:
-
-```bash
-export AUTH_TOKEN=your_token_here
-```
-
-Then run without `--token`:
-
-```bash
-python import_whatsapp_photos.py \
-  --export-folder /path/to/whatsapp/export \
-  --space-id karunakaran
-```
-
-## Command-Line Arguments
-
-| Argument | Required | Default | Description |
+**Script location**: `backend/scripts/import_whatsapp_photos.py`
+**Dependencies**: `requests` library (already in requirements)
 |----------|----------|---------|-------------|
 | `--export-folder` | Yes | - | Path to WhatsApp chat export folder |
 | `--space-id` | Yes | - | Space ID to upload photos to |

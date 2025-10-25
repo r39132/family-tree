@@ -38,21 +38,28 @@ export default function AlbumPage() {
   const [stats, setStats] = useState<AlbumStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+  const [deleting, setDeleting] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
-  
+
+  // Selection mode
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
+
   // Filters and sorting
   const [filterUploader, setFilterUploader] = useState('');
   const [filterTags, setFilterTags] = useState('');
   const [sortBy, setSortBy] = useState('upload_date');
   const [sortOrder, setSortOrder] = useState('desc');
-  
+
   // Lightbox
   const [selectedPhoto, setSelectedPhoto] = useState<AlbumPhoto | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [newTags, setNewTags] = useState('');
   const [likedPhotos, setLikedPhotos] = useState<Set<string>>(new Set());
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -83,7 +90,7 @@ export default function AlbumPage() {
 
   async function loadPhotos() {
     if (!userInfo?.current_space) return;
-    
+
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -91,7 +98,7 @@ export default function AlbumPage() {
         sort_order: sortOrder,
         limit: '100'
       });
-      
+
       const data = await api(`/spaces/${userInfo.current_space}/album/photos?${params}`);
       setPhotos(data);
       setError(null);
@@ -104,7 +111,7 @@ export default function AlbumPage() {
 
   async function loadStats() {
     if (!userInfo?.current_space) return;
-    
+
     try {
       const data = await api(`/spaces/${userInfo.current_space}/album/stats`);
       setStats(data);
@@ -115,32 +122,39 @@ export default function AlbumPage() {
 
   function applyFilters() {
     let filtered = [...photos];
-    
+
     if (filterUploader) {
       filtered = filtered.filter(p => p.uploader_id === filterUploader);
     }
-    
+
     if (filterTags) {
       const tagList = filterTags.split(',').map(t => t.trim().toLowerCase());
-      filtered = filtered.filter(p => 
+      filtered = filtered.filter(p =>
         p.tags.some(t => tagList.includes(t.toLowerCase()))
       );
     }
-    
+
     setFilteredPhotos(filtered);
   }
 
   async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
     if (!event.target.files || !userInfo?.current_space) return;
-    
+
     const files = Array.from(event.target.files);
-    
-    for (const file of files) {
+    const totalFiles = files.length;
+
+    setUploading(true);
+    setUploadProgress({ current: 0, total: totalFiles });
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
       try {
-        setUploading(true);
         const formData = new FormData();
         formData.append('file', file);
-        
+
         const response = await fetch(
           `${process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080'}/spaces/${userInfo.current_space}/album/photos`,
           {
@@ -151,21 +165,34 @@ export default function AlbumPage() {
             body: formData
           }
         );
-        
+
         if (!response.ok) {
           throw new Error(`Upload failed: ${response.statusText}`);
         }
-        
+
+        successCount++;
       } catch (e: any) {
         console.error('Upload error:', e);
-        setError(e.message || 'Upload failed');
+        failCount++;
       }
+
+      // Update progress after each file
+      setUploadProgress({ current: i + 1, total: totalFiles });
     }
-    
+
+    // Show completion briefly
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     setUploading(false);
+    setUploadProgress({ current: 0, total: 0 });
+
+    if (failCount > 0) {
+      setError(`Uploaded ${successCount} photos. Failed: ${failCount}`);
+    }
+
     loadPhotos();
     loadStats();
-    
+
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -173,9 +200,9 @@ export default function AlbumPage() {
 
   async function toggleLike(photoId: string) {
     if (!userInfo?.current_space) return;
-    
+
     const isLiked = likedPhotos.has(photoId);
-    
+
     try {
       if (isLiked) {
         await api(`/spaces/${userInfo.current_space}/album/photos/${photoId}/like`, {
@@ -192,7 +219,7 @@ export default function AlbumPage() {
         });
         setLikedPhotos(prev => new Set(prev).add(photoId));
       }
-      
+
       loadPhotos();
     } catch (e: any) {
       console.error('Like toggle error:', e);
@@ -201,15 +228,15 @@ export default function AlbumPage() {
 
   async function updateTags(photoId: string, tags: string[]) {
     if (!userInfo?.current_space) return;
-    
+
     try {
       await api(`/spaces/${userInfo.current_space}/album/photos/${photoId}/tags`, {
         method: 'PUT',
         body: JSON.stringify({ tags })
       });
-      
+
       loadPhotos();
-      
+
       if (selectedPhoto?.id === photoId) {
         setSelectedPhoto({ ...selectedPhoto, tags });
       }
@@ -230,13 +257,13 @@ export default function AlbumPage() {
 
   function navigatePhoto(direction: 'prev' | 'next') {
     let newIndex = lightboxIndex;
-    
+
     if (direction === 'prev') {
       newIndex = lightboxIndex > 0 ? lightboxIndex - 1 : filteredPhotos.length - 1;
     } else {
       newIndex = lightboxIndex < filteredPhotos.length - 1 ? lightboxIndex + 1 : 0;
     }
-    
+
     setLightboxIndex(newIndex);
     setSelectedPhoto(filteredPhotos[newIndex]);
     setNewTags(filteredPhotos[newIndex].tags.join(', '));
@@ -244,7 +271,7 @@ export default function AlbumPage() {
 
   function handleAddTags() {
     if (!selectedPhoto) return;
-    
+
     const tags = newTags.split(',').map(t => t.trim()).filter(t => t);
     updateTags(selectedPhoto.id, tags);
   }
@@ -252,19 +279,95 @@ export default function AlbumPage() {
   async function deletePhoto(photoId: string) {
     if (!userInfo?.current_space) return;
     if (!confirm('Are you sure you want to delete this photo?')) return;
-    
+
     try {
+      setDeleting(true);
+      setDeleteProgress({ current: 1, total: 1 });
+
       await api(`/spaces/${userInfo.current_space}/album/photos/${photoId}`, {
         method: 'DELETE'
       });
-      
+
       closeLightbox();
       loadPhotos();
       loadStats();
     } catch (e: any) {
       console.error('Delete error:', e);
       setError(e.message || 'Failed to delete photo');
+    } finally {
+      setDeleting(false);
+      setDeleteProgress({ current: 0, total: 0 });
     }
+  }
+
+  async function bulkDeletePhotos() {
+    if (!userInfo?.current_space) return;
+    if (selectedPhotos.size === 0) return;
+
+    const count = selectedPhotos.size;
+    if (!confirm(`Are you sure you want to delete ${count} photo${count > 1 ? 's' : ''}?`)) return;
+
+    try {
+      setDeleting(true);
+      setDeleteProgress({ current: 0, total: count });
+
+      const response = await api(
+        `/spaces/${userInfo.current_space}/album/photos/bulk-delete`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ photo_ids: Array.from(selectedPhotos) })
+        }
+      );
+
+      setDeleteProgress({ current: response.successful, total: count });
+
+      if (response.successful > 0) {
+        setSelectedPhotos(new Set());
+        setSelectionMode(false);
+
+        // Wait a bit to show completion before reloading
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        loadPhotos();
+        loadStats();
+      }
+
+      if (response.failed > 0) {
+        const errorMsg = response.errors.map((e: any) => e.error).join(', ');
+        setError(`Deleted ${response.successful} photos. Failed: ${response.failed}. Errors: ${errorMsg}`);
+      }
+    } catch (e: any) {
+      console.error('Bulk delete error:', e);
+      setError(e.message || 'Failed to delete photos');
+    } finally {
+      setDeleting(false);
+      setDeleteProgress({ current: 0, total: 0 });
+    }
+  }
+
+  function togglePhotoSelection(photoId: string) {
+    setSelectedPhotos(prev => {
+      const next = new Set(prev);
+      if (next.has(photoId)) {
+        next.delete(photoId);
+      } else {
+        next.add(photoId);
+      }
+      return next;
+    });
+  }
+
+  function selectAll() {
+    setSelectedPhotos(new Set(filteredPhotos.map(p => p.id)));
+  }
+
+  function clearSelection() {
+    setSelectedPhotos(new Set());
+  }
+
+  function cancelSelectionMode() {
+    setSelectionMode(false);
+    setSelectedPhotos(new Set());
   }
 
   function clearFilters() {
@@ -284,24 +387,244 @@ export default function AlbumPage() {
   return (
     <>
       <TopNav />
-      <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+
+      {/* Upload Progress Overlay */}
+      {uploading && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          zIndex: 2000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '30px',
+            borderRadius: '8px',
+            minWidth: '400px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+          }}>
+            <h3 style={{ margin: '0 0 20px 0', textAlign: 'center' }}>
+              Uploading Photos...
+            </h3>
+            <div style={{
+              width: '100%',
+              height: '30px',
+              backgroundColor: '#e0e0e0',
+              borderRadius: '15px',
+              overflow: 'hidden',
+              marginBottom: '15px'
+            }}>
+              <div style={{
+                width: uploadProgress.total > 0
+                  ? `${(uploadProgress.current / uploadProgress.total) * 100}%`
+                  : '0%',
+                height: '100%',
+                backgroundColor: '#2e7d32',
+                transition: 'width 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}>
+                {uploadProgress.total > 0 &&
+                  `${Math.round((uploadProgress.current / uploadProgress.total) * 100)}%`
+                }
+              </div>
+            </div>
+            <p style={{
+              textAlign: 'center',
+              margin: 0,
+              color: '#666',
+              fontSize: '14px'
+            }}>
+              {uploadProgress.current} of {uploadProgress.total} photos uploaded
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Deletion Progress Overlay */}
+      {deleting && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          zIndex: 2000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '30px',
+            borderRadius: '8px',
+            minWidth: '400px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+          }}>
+            <h3 style={{ margin: '0 0 20px 0', textAlign: 'center' }}>
+              Deleting Photos...
+            </h3>
+            <div style={{
+              width: '100%',
+              height: '30px',
+              backgroundColor: '#e0e0e0',
+              borderRadius: '15px',
+              overflow: 'hidden',
+              marginBottom: '15px'
+            }}>
+              <div style={{
+                width: deleteProgress.total > 0
+                  ? `${(deleteProgress.current / deleteProgress.total) * 100}%`
+                  : '0%',
+                height: '100%',
+                backgroundColor: '#2e7d32',
+                transition: 'width 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}>
+                {deleteProgress.total > 0 &&
+                  `${Math.round((deleteProgress.current / deleteProgress.total) * 100)}%`
+                }
+              </div>
+            </div>
+            <p style={{
+              textAlign: 'center',
+              margin: 0,
+              color: '#666',
+              fontSize: '14px'
+            }}>
+              {deleteProgress.current} of {deleteProgress.total} photos deleted
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto', opacity: (deleting || uploading) ? 0.5 : 1, pointerEvents: (deleting || uploading) ? 'none' : 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '10px', flexWrap: 'wrap' }}>
           <h1 style={{ margin: 0 }}>📷 Family Album</h1>
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: '#2e7d32',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: uploading ? 'not-allowed' : 'pointer',
-              fontSize: '16px'
-            }}
-          >
-            {uploading ? 'Uploading...' : '+ Upload Photos'}
-          </button>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {!selectionMode ? (
+              <>
+                <button
+                  onClick={() => setSelectionMode(true)}
+                  disabled={deleting || uploading}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#666',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: (deleting || uploading) ? 'not-allowed' : 'pointer',
+                    fontSize: '16px',
+                    opacity: (deleting || uploading) ? 0.5 : 1
+                  }}
+                >
+                  Select Photos
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading || deleting}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#2e7d32',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: (uploading || deleting) ? 'not-allowed' : 'pointer',
+                    fontSize: '16px',
+                    opacity: (uploading || deleting) ? 0.5 : 1
+                  }}
+                >
+                  {uploading ? 'Uploading...' : '+ Upload Photos'}
+                </button>
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: '14px', color: '#666' }}>
+                  {selectedPhotos.size} selected
+                </span>
+                <button
+                  onClick={selectAll}
+                  disabled={deleting}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#1976d2',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: deleting ? 'not-allowed' : 'pointer',
+                    fontSize: '16px',
+                    opacity: deleting ? 0.5 : 1
+                  }}
+                >
+                  Select All
+                </button>
+                <button
+                  onClick={clearSelection}
+                  disabled={selectedPhotos.size === 0 || deleting}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#666',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: (selectedPhotos.size === 0 || deleting) ? 'not-allowed' : 'pointer',
+                    fontSize: '16px',
+                    opacity: (selectedPhotos.size === 0 || deleting) ? 0.5 : 1
+                  }}
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={bulkDeletePhotos}
+                  disabled={selectedPhotos.size === 0 || deleting}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#c62828',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: (selectedPhotos.size === 0 || deleting) ? 'not-allowed' : 'pointer',
+                    fontSize: '16px',
+                    opacity: (selectedPhotos.size === 0 || deleting) ? 0.5 : 1
+                  }}
+                >
+                  {deleting ? 'Deleting...' : `🗑️ Delete (${selectedPhotos.size})`}
+                </button>
+                <button
+                  onClick={cancelSelectionMode}
+                  disabled={deleting}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#fff',
+                    color: '#333',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    cursor: deleting ? 'not-allowed' : 'pointer',
+                    fontSize: '16px',
+                    opacity: deleting ? 0.5 : 1
+                  }}
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
           <input
             ref={fileInputRef}
             type="file"
@@ -313,10 +636,10 @@ export default function AlbumPage() {
         </div>
 
         {stats && (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
-            gap: '15px', 
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: '15px',
             marginBottom: '20px',
             padding: '15px',
             backgroundColor: '#f5f5f5',
@@ -338,10 +661,10 @@ export default function AlbumPage() {
         )}
 
         {error && (
-          <div style={{ 
-            padding: '10px', 
-            backgroundColor: '#ffebee', 
-            color: '#c62828', 
+          <div style={{
+            padding: '10px',
+            backgroundColor: '#ffebee',
+            color: '#c62828',
             borderRadius: '4px',
             marginBottom: '20px'
           }}>
@@ -350,15 +673,15 @@ export default function AlbumPage() {
         )}
 
         {/* Filters and Sorting */}
-        <div style={{ 
-          display: 'flex', 
-          gap: '10px', 
+        <div style={{
+          display: 'flex',
+          gap: '10px',
           marginBottom: '20px',
           flexWrap: 'wrap',
           alignItems: 'center'
         }}>
-          <select 
-            value={sortBy} 
+          <select
+            value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
             style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
           >
@@ -367,31 +690,31 @@ export default function AlbumPage() {
             <option value="filename">Filename</option>
             <option value="uploader">Uploader</option>
           </select>
-          
-          <select 
-            value={sortOrder} 
+
+          <select
+            value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value)}
             style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
           >
             <option value="desc">Descending</option>
             <option value="asc">Ascending</option>
           </select>
-          
+
           <input
             type="text"
             placeholder="Filter by tags (comma-separated)"
             value={filterTags}
             onChange={(e) => setFilterTags(e.target.value)}
-            style={{ 
-              padding: '8px', 
-              borderRadius: '4px', 
+            style={{
+              padding: '8px',
+              borderRadius: '4px',
               border: '1px solid #ccc',
               minWidth: '200px'
             }}
           />
-          
+
           {(filterUploader || filterTags) && (
-            <button 
+            <button
               onClick={clearFilters}
               style={{
                 padding: '8px 12px',
@@ -409,8 +732,8 @@ export default function AlbumPage() {
 
         {/* Photo Grid */}
         {filteredPhotos.length === 0 ? (
-          <div style={{ 
-            textAlign: 'center', 
+          <div style={{
+            textAlign: 'center',
             padding: '40px',
             color: '#666',
             fontSize: '18px'
@@ -418,44 +741,72 @@ export default function AlbumPage() {
             {photos.length === 0 ? 'No photos yet. Upload some to get started!' : 'No photos match your filters.'}
           </div>
         ) : (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', 
-            gap: '20px' 
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+            gap: '20px'
           }}>
             {filteredPhotos.map((photo, index) => (
-              <div 
+              <div
                 key={photo.id}
-                onClick={() => openLightbox(photo, index)}
+                onClick={() => selectionMode ? togglePhotoSelection(photo.id) : openLightbox(photo, index)}
                 style={{
                   cursor: 'pointer',
                   borderRadius: '8px',
                   overflow: 'hidden',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                   transition: 'transform 0.2s, box-shadow 0.2s',
-                  backgroundColor: '#fff'
+                  backgroundColor: '#fff',
+                  position: 'relative',
+                  border: selectionMode && selectedPhotos.has(photo.id) ? '4px solid #1976d2' : 'none'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'scale(1.02)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+                  if (!selectionMode) {
+                    e.currentTarget.style.transform = 'scale(1.02)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                  if (!selectionMode) {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                  }
                 }}
               >
-                <img 
-                  src={photo.thumbnail_cdn_url} 
+                {selectionMode && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '10px',
+                      right: '10px',
+                      width: '30px',
+                      height: '30px',
+                      borderRadius: '50%',
+                      backgroundColor: selectedPhotos.has(photo.id) ? '#1976d2' : 'rgba(255,255,255,0.9)',
+                      border: selectedPhotos.has(photo.id) ? 'none' : '2px solid #ccc',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '18px',
+                      color: 'white',
+                      zIndex: 10
+                    }}
+                  >
+                    {selectedPhotos.has(photo.id) && '✓'}
+                  </div>
+                )}
+                <img
+                  src={photo.thumbnail_cdn_url}
                   alt={photo.filename}
-                  style={{ 
-                    width: '100%', 
-                    height: '250px', 
+                  style={{
+                    width: '100%',
+                    height: '250px',
                     objectFit: 'cover'
                   }}
                 />
                 <div style={{ padding: '12px' }}>
-                  <div style={{ 
-                    fontSize: '14px', 
+                  <div style={{
+                    fontSize: '14px',
                     color: '#666',
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -465,8 +816,8 @@ export default function AlbumPage() {
                     <span>❤️ {photo.like_count}</span>
                   </div>
                   {photo.tags.length > 0 && (
-                    <div style={{ 
-                      marginTop: '8px', 
+                    <div style={{
+                      marginTop: '8px',
                       fontSize: '12px',
                       color: '#2e7d32'
                     }}>
@@ -481,7 +832,7 @@ export default function AlbumPage() {
 
         {/* Lightbox */}
         {selectedPhoto && (
-          <div 
+          <div
             style={{
               position: 'fixed',
               top: 0,
@@ -498,9 +849,9 @@ export default function AlbumPage() {
             }}
             onClick={closeLightbox}
           >
-            <div 
-              style={{ 
-                maxWidth: '90%', 
+            <div
+              style={{
+                maxWidth: '90%',
                 maxHeight: '90%',
                 display: 'flex',
                 flexDirection: 'column',
@@ -510,14 +861,14 @@ export default function AlbumPage() {
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
                 padding: '15px',
                 borderBottom: '1px solid #eee'
               }}>
                 <h3 style={{ margin: 0 }}>{selectedPhoto.filename}</h3>
-                <button 
+                <button
                   onClick={closeLightbox}
                   style={{
                     background: 'none',
@@ -530,8 +881,8 @@ export default function AlbumPage() {
                   ✕
                 </button>
               </div>
-              
-              <div style={{ 
+
+              <div style={{
                 position: 'relative',
                 flex: 1,
                 display: 'flex',
@@ -556,17 +907,17 @@ export default function AlbumPage() {
                 >
                   ‹
                 </button>
-                
-                <img 
-                  src={selectedPhoto.cdn_url} 
+
+                <img
+                  src={selectedPhoto.cdn_url}
                   alt={selectedPhoto.filename}
-                  style={{ 
-                    maxWidth: '100%', 
+                  style={{
+                    maxWidth: '100%',
                     maxHeight: '70vh',
                     objectFit: 'contain'
                   }}
                 />
-                
+
                 <button
                   onClick={() => navigatePhoto('next')}
                   style={{
@@ -585,11 +936,11 @@ export default function AlbumPage() {
                   ›
                 </button>
               </div>
-              
+
               <div style={{ padding: '15px', borderTop: '1px solid #eee' }}>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
                   alignItems: 'center',
                   marginBottom: '10px'
                 }}>
@@ -611,14 +962,14 @@ export default function AlbumPage() {
                     ❤️ {selectedPhoto.like_count}
                   </button>
                 </div>
-                
+
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <input
                     type="text"
                     value={newTags}
                     onChange={(e) => setNewTags(e.target.value)}
                     placeholder="Add tags (comma-separated)"
-                    style={{ 
+                    style={{
                       flex: 1,
                       padding: '8px',
                       borderRadius: '4px',
@@ -627,13 +978,15 @@ export default function AlbumPage() {
                   />
                   <button
                     onClick={handleAddTags}
+                    disabled={deleting}
                     style={{
                       padding: '8px 16px',
                       backgroundColor: '#2e7d32',
                       color: 'white',
                       border: 'none',
                       borderRadius: '4px',
-                      cursor: 'pointer'
+                      cursor: deleting ? 'not-allowed' : 'pointer',
+                      opacity: deleting ? 0.5 : 1
                     }}
                   >
                     Update Tags
@@ -641,16 +994,18 @@ export default function AlbumPage() {
                   {selectedPhoto.uploader_id === userInfo?.username && (
                     <button
                       onClick={() => deletePhoto(selectedPhoto.id)}
+                      disabled={deleting}
                       style={{
                         padding: '8px 16px',
                         backgroundColor: '#c62828',
                         color: 'white',
                         border: 'none',
                         borderRadius: '4px',
-                        cursor: 'pointer'
+                        cursor: deleting ? 'not-allowed' : 'pointer',
+                        opacity: deleting ? 0.5 : 1
                       }}
                     >
-                      Delete
+                      {deleting ? 'Deleting...' : 'Delete'}
                     </button>
                   )}
                 </div>
