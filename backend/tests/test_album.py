@@ -55,7 +55,7 @@ def mock_storage(monkeypatch):
     upload_counter = {"count": 0}
 
     def mock_upload(file_content, content_type, space_id):
-        photo_id = f"test-photo-id-{upload_counter['count']}"
+        photo_id = f"test-photo-id-{upload_counter["count"]}"
         upload_counter["count"] += 1
         return (
             photo_id,
