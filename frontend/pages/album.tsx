@@ -3,6 +3,10 @@ import { useRouter } from 'next/router';
 import TopNav from '../components/TopNav';
 import { api } from '../lib/api';
 import LoadingOverlay from '../components/LoadingOverlay';
+import dynamic from 'next/dynamic';
+
+// Dynamically import MapView to avoid SSR issues
+const AlbumMapView = dynamic(() => import('../components/AlbumMapView'), { ssr: false });
 
 type AlbumPhoto = {
   id: string;
@@ -813,38 +817,7 @@ export default function AlbumPage() {
           </div>
         ) : viewMode === 'map' ? (
           // Map View
-          (() => {
-            const photosWithLocation = filteredPhotos.filter(p => p.gps_latitude && p.gps_longitude);
-            if (photosWithLocation.length === 0) {
-              return (
-                <div style={{
-                  textAlign: 'center',
-                  padding: '40px',
-                  color: '#666',
-                  fontSize: '18px'
-                }}>
-                  No photos with location data
-                </div>
-              );
-            }
-            return (
-              <div style={{
-                width: '100%',
-                height: '600px',
-                backgroundColor: '#f5f5f5',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#666',
-                fontSize: '18px'
-              }}>
-                Map view will be implemented with {photosWithLocation.length} geo-tagged photo{photosWithLocation.length !== 1 ? 's' : ''}
-                <br />
-                (Requires mapping library integration)
-              </div>
-            );
-          })()
+          <AlbumMapView photos={filteredPhotos} onPhotoClick={openLightbox} />
         ) : viewMode === 'standard' ? (
           // Standard View - Larger images
           <div style={{
