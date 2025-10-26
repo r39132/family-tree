@@ -109,7 +109,52 @@ def test_list_photos_empty(fake_album_db, authenticated_client):
             response = authenticated_client.get("/spaces/demo/album/photos")
 
     assert response.status_code == 200
-    assert response.json() == []
+    data = response.json()
+    assert data["photos"] == []
+    assert data["total"] == 0
+    assert data["page"] == 1
+    assert data["per_page"] == 10
+    assert data["total_pages"] == 0
+
+
+def test_list_photos_pagination(fake_album_db, authenticated_client, mock_storage):
+    """Test photo pagination."""
+    with patch("app.routes_album.get_db", return_value=fake_album_db):
+        with patch("app.routes_album.get_user_space", return_value="demo"):
+            # Upload 15 photos
+            for i in range(15):
+                img_bytes = create_test_image()
+                authenticated_client.post(
+                    "/spaces/demo/album/photos",
+                    files={"file": (f"test{i}.jpg", img_bytes, "image/jpeg")},
+                )
+
+            # Test first page with limit=10
+            response = authenticated_client.get("/spaces/demo/album/photos?limit=10&offset=0")
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data["photos"]) == 10
+            assert data["total"] == 15
+            assert data["page"] == 1
+            assert data["per_page"] == 10
+            assert data["total_pages"] == 2
+
+            # Test second page
+            response = authenticated_client.get("/spaces/demo/album/photos?limit=10&offset=10")
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data["photos"]) == 5
+            assert data["total"] == 15
+            assert data["page"] == 2
+            assert data["per_page"] == 10
+            assert data["total_pages"] == 2
+
+            # Test using page parameter
+            response = authenticated_client.get("/spaces/demo/album/photos?limit=10&page=2")
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data["photos"]) == 5
+            assert data["page"] == 2
 
 
 def test_like_photo_success(fake_album_db, authenticated_client, mock_storage):

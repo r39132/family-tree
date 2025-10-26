@@ -17,6 +17,7 @@ from .models import (
     BulkPhotoDeleteRequest,
     BulkPhotoDeleteResponse,
     BulkPhotoUploadResponse,
+    PaginatedPhotosResponse,
 )
 from .routes_spaces import get_user_space
 from .utils.time import to_iso_string, utc_now
@@ -216,7 +217,7 @@ async def bulk_upload_photos(
     )
 
 
-@router.get("/{space_id}/album/photos", response_model=List[AlbumPhoto])
+@router.get("/{space_id}/album/photos", response_model=PaginatedPhotosResponse)
 def list_photos(
     space_id: str,
     current_user: str = Depends(get_current_username),
@@ -224,12 +225,18 @@ def list_photos(
     tags: Optional[str] = None,  # Comma-separated tags
     sort_by: str = "upload_date",
     sort_order: str = "desc",
-    limit: int = 50,
+    limit: int = 10,
+    offset: int = 0,
+    page: Optional[int] = None,  # Page number (1-based), alternative to offset
 ):
-    """List photos in the album with filtering and sorting."""
+    """List photos in the album with filtering, sorting, and pagination."""
     # Check space access
     if not check_space_access(current_user, space_id):
         raise HTTPException(status_code=403, detail="Access denied to this space")
+
+    # Convert page to offset if provided
+    if page is not None:
+        offset = (page - 1) * limit
 
     db = get_db()
     query = db.collection("album_photos").where("space_id", "==", space_id)
@@ -291,8 +298,21 @@ def list_photos(
 
         random.shuffle(photos)
 
-    # Apply limit
-    return photos[:limit]
+    # Calculate pagination metadata
+    total = len(photos)
+    total_pages = (total + limit - 1) // limit if limit > 0 else 0
+    current_page = (offset // limit) + 1 if limit > 0 else 1
+
+    # Apply pagination
+    paginated_photos = photos[offset : offset + limit]
+
+    return PaginatedPhotosResponse(
+        photos=paginated_photos,
+        total=total,
+        page=current_page,
+        per_page=limit,
+        total_pages=total_pages,
+    )
 
 
 @router.get("/{space_id}/album/photos/{photo_id}", response_model=AlbumPhoto)

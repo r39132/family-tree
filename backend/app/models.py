@@ -437,6 +437,16 @@ class AlbumStats(BaseModel):
     recent_uploads: int  # Last 7 days
 
 
+class PaginatedPhotosResponse(BaseModel):
+    """Response model for paginated photos"""
+
+    photos: List[AlbumPhoto]
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
+
+
 class BulkPhotoUploadResponse(BaseModel):
     """Response model for bulk photo uploads"""
 
