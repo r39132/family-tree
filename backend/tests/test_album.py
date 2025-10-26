@@ -52,14 +52,17 @@ def fake_album_db():
 @pytest.fixture
 def mock_storage(monkeypatch):
     """Mock GCS storage."""
+    upload_counter = {"count": 0}
 
     def mock_upload(file_content, content_type, space_id):
+        photo_id = f"test-photo-id-{upload_counter["count"]}"
+        upload_counter["count"] += 1
         return (
-            "test-photo-id",
-            "demo/originals/test-photo-id.jpg",
-            "demo/thumbnails/test-photo-id_thumb.jpg",
-            "https://cdn.example.com/test-photo-id.jpg",
-            "https://cdn.example.com/test-photo-id_thumb.jpg",
+            photo_id,
+            f"demo/originals/{photo_id}.jpg",
+            f"demo/thumbnails/{photo_id}_thumb.jpg",
+            f"https://cdn.example.com/{photo_id}.jpg",
+            f"https://cdn.example.com/{photo_id}_thumb.jpg",
             800,
             600,
         )
@@ -109,7 +112,55 @@ def test_list_photos_empty(fake_album_db, authenticated_client):
             response = authenticated_client.get("/spaces/demo/album/photos")
 
     assert response.status_code == 200
-    assert response.json() == []
+    data = response.json()
+    assert data["photos"] == []
+    assert data["total"] == 0
+    assert data["page"] == 1
+    assert data["per_page"] == 10
+    assert data["total_pages"] == 0
+
+
+def test_list_photos_pagination(fake_album_db, authenticated_client, mock_storage):
+    """Test photo pagination."""
+    with patch("app.routes_album.get_db", return_value=fake_album_db):
+        with patch("app.routes_album.get_user_space", return_value="demo"):
+            # Upload 15 photos
+            for i in range(15):
+                img_bytes = create_test_image()
+                upload_response = authenticated_client.post(
+                    "/spaces/demo/album/photos",
+                    files={"file": (f"test{i}.jpg", img_bytes, "image/jpeg")},
+                )
+                assert (
+                    upload_response.status_code == 200
+                ), f"Upload {i} failed: {upload_response.json()}"
+
+            # Test first page with limit=10
+            response = authenticated_client.get("/spaces/demo/album/photos?limit=10&offset=0")
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data["photos"]) == 10
+            assert data["total"] == 15
+            assert data["page"] == 1
+            assert data["per_page"] == 10
+            assert data["total_pages"] == 2
+
+            # Test second page
+            response = authenticated_client.get("/spaces/demo/album/photos?limit=10&offset=10")
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data["photos"]) == 5
+            assert data["total"] == 15
+            assert data["page"] == 2
+            assert data["per_page"] == 10
+            assert data["total_pages"] == 2
+
+            # Test using page parameter
+            response = authenticated_client.get("/spaces/demo/album/photos?limit=10&page=2")
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data["photos"]) == 5
+            assert data["page"] == 2
 
 
 def test_like_photo_success(fake_album_db, authenticated_client, mock_storage):

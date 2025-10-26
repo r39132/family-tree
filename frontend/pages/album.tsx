@@ -55,6 +55,19 @@ export default function AlbumPage() {
   const [sortBy, setSortBy] = useState('upload_date');
   const [sortOrder, setSortOrder] = useState('desc');
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(() => {
+    // Load from localStorage or default to 10
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('album_per_page');
+      return saved ? parseInt(saved, 10) : 10;
+    }
+    return 10;
+  });
+  const [totalPhotos, setTotalPhotos] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
   // Lightbox
   const [selectedPhoto, setSelectedPhoto] = useState<AlbumPhoto | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -78,11 +91,35 @@ export default function AlbumPage() {
       loadPhotos();
       loadStats();
     }
-  }, [userInfo, sortBy, sortOrder]);
+  }, [userInfo, sortBy, sortOrder, currentPage, perPage]);
 
   useEffect(() => {
-    applyFilters();
-  }, [photos, filterUploader, filterTags]);
+    // Update URL query params
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      params.set('page', currentPage.toString());
+      params.set('per_page', perPage.toString());
+      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [currentPage, perPage]);
+
+  useEffect(() => {
+    // Load page from URL on mount
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const pageParam = params.get('page');
+      const perPageParam = params.get('per_page');
+      if (pageParam) {
+        setCurrentPage(parseInt(pageParam, 10));
+      }
+      if (perPageParam) {
+        const perPageValue = parseInt(perPageParam, 10);
+        setPerPage(perPageValue);
+        localStorage.setItem('album_per_page', perPageValue.toString());
+      }
+    }
+  }, []);
 
   async function loadUserInfo() {
     try {
@@ -103,12 +140,20 @@ export default function AlbumPage() {
       const params = new URLSearchParams({
         sort_by: sortBy,
         sort_order: sortOrder,
-        limit: '100'
+        limit: perPage.toString(),
+        page: currentPage.toString()
       });
 
       const data = await api(`/spaces/${userInfo.current_space}/album/photos?${params}`);
-      setPhotos(data);
+      setPhotos(data.photos);
+      setTotalPhotos(data.total);
+      setTotalPages(data.total_pages);
       setError(null);
+
+      // Scroll to top when page changes
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     } catch (e: any) {
       setError(e.message || 'Failed to load photos');
     } finally {
@@ -127,22 +172,10 @@ export default function AlbumPage() {
     }
   }
 
-  function applyFilters() {
-    let filtered = [...photos];
-
-    if (filterUploader) {
-      filtered = filtered.filter(p => p.uploader_id === filterUploader);
-    }
-
-    if (filterTags) {
-      const tagList = filterTags.split(',').map(t => t.trim().toLowerCase());
-      filtered = filtered.filter(p =>
-        p.tags.some(t => tagList.includes(t.toLowerCase()))
-      );
-    }
-
-    setFilteredPhotos(filtered);
-  }
+  // Since backend handles filtering, we just use photos as filteredPhotos
+  useEffect(() => {
+    setFilteredPhotos(photos);
+  }, [photos]);
 
   async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
     if (!event.target.files || !userInfo?.current_space) return;
@@ -865,6 +898,125 @@ export default function AlbumPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {totalPhotos > 0 && (
+          <div style={{
+            marginTop: '30px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+            alignItems: 'center'
+          }}>
+            {/* Pagination Info */}
+            <div style={{ fontSize: '14px', color: '#666' }}>
+              Showing {Math.min((currentPage - 1) * perPage + 1, totalPhotos)} - {Math.min(currentPage * perPage, totalPhotos)} of {totalPhotos} photos
+            </div>
+
+            {/* Items per page selector */}
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <span style={{ fontSize: '14px', color: '#666' }}>Photos per page:</span>
+              <select
+                value={perPage}
+                onChange={(e) => {
+                  const newPerPage = parseInt(e.target.value, 10);
+                  setPerPage(newPerPage);
+                  setCurrentPage(1);
+                  localStorage.setItem('album_per_page', newPerPage.toString());
+                }}
+                disabled={loading}
+                style={{
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ccc',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.5 : 1
+                }}
+              >
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+
+            {/* Page navigation */}
+            {totalPages > 1 && (
+              <div style={{
+                display: 'flex',
+                gap: '10px',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                justifyContent: 'center'
+              }}>
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1 || loading}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: currentPage === 1 ? '#e0e0e0' : '#2e7d32',
+                    color: currentPage === 1 ? '#999' : 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: (currentPage === 1 || loading) ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.5 : 1
+                  }}
+                >
+                  ← Previous
+                </button>
+
+                {/* Page numbers */}
+                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 7) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 4) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 3) {
+                    pageNum = totalPages - 6 + i;
+                  } else {
+                    pageNum = currentPage - 3 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      disabled={loading}
+                      style={{
+                        padding: '8px 12px',
+                        backgroundColor: pageNum === currentPage ? '#1976d2' : '#fff',
+                        color: pageNum === currentPage ? 'white' : '#333',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        fontWeight: pageNum === currentPage ? 'bold' : 'normal',
+                        opacity: loading ? 0.5 : 1
+                      }}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages || loading}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: currentPage === totalPages ? '#e0e0e0' : '#2e7d32',
+                    color: currentPage === totalPages ? '#999' : 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: (currentPage === totalPages || loading) ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.5 : 1
+                  }}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
           </div>
         )}
 
