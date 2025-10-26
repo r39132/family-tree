@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import TopNav from '../components/TopNav';
 import { api } from '../lib/api';
 import LoadingOverlay from '../components/LoadingOverlay';
+import Toast, { ToastType } from '../components/Toast';
 
 type AlbumPhoto = {
   id: string;
@@ -59,6 +60,12 @@ export default function AlbumPage() {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [newTags, setNewTags] = useState('');
   const [likedPhotos, setLikedPhotos] = useState<Set<string>>(new Set());
+
+  // Toast notifications
+  const [toast, setToast] = useState<{ type: ToastType; message: string } | null>(null);
+  
+  // Tag save state
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -229,11 +236,19 @@ export default function AlbumPage() {
   async function updateTags(photoId: string, tags: string[]) {
     if (!userInfo?.current_space) return;
 
+    setSaveState('saving');
+
     try {
       await api(`/spaces/${userInfo.current_space}/album/photos/${photoId}/tags`, {
         method: 'PUT',
         body: JSON.stringify({ tags })
       });
+
+      setSaveState('saved');
+      setToast({ type: 'success', message: 'Tags updated successfully' });
+
+      // Reset state after 2 seconds
+      setTimeout(() => setSaveState('idle'), 2000);
 
       loadPhotos();
 
@@ -242,6 +257,11 @@ export default function AlbumPage() {
       }
     } catch (e: any) {
       console.error('Tag update error:', e);
+      setSaveState('error');
+      setToast({ type: 'error', message: e.message || 'Failed to update tags' });
+
+      // Reset state after 3 seconds
+      setTimeout(() => setSaveState('idle'), 3000);
     }
   }
 
@@ -249,10 +269,12 @@ export default function AlbumPage() {
     setSelectedPhoto(photo);
     setLightboxIndex(index);
     setNewTags(photo.tags.join(', '));
+    setSaveState('idle');
   }
 
   function closeLightbox() {
     setSelectedPhoto(null);
+    setSaveState('idle');
   }
 
   function navigatePhoto(direction: 'prev' | 'next') {
@@ -267,6 +289,7 @@ export default function AlbumPage() {
     setLightboxIndex(newIndex);
     setSelectedPhoto(filteredPhotos[newIndex]);
     setNewTags(filteredPhotos[newIndex].tags.join(', '));
+    setSaveState('idle');
   }
 
   function handleAddTags() {
@@ -380,6 +403,13 @@ export default function AlbumPage() {
       <>
         <TopNav />
         <LoadingOverlay isLoading={true} message="Loading album..." />
+        {toast && (
+          <Toast
+            type={toast.type}
+            message={toast.message}
+            onDismiss={() => setToast(null)}
+          />
+        )}
       </>
     );
   }
@@ -969,27 +999,30 @@ export default function AlbumPage() {
                     value={newTags}
                     onChange={(e) => setNewTags(e.target.value)}
                     placeholder="Add tags (comma-separated)"
+                    disabled={saveState === 'saving'}
                     style={{
                       flex: 1,
                       padding: '8px',
                       borderRadius: '4px',
-                      border: '1px solid #ddd'
+                      border: '1px solid #ddd',
+                      opacity: saveState === 'saving' ? 0.6 : 1
                     }}
                   />
                   <button
                     onClick={handleAddTags}
-                    disabled={deleting}
+                    disabled={deleting || saveState === 'saving'}
                     style={{
                       padding: '8px 16px',
-                      backgroundColor: '#2e7d32',
+                      backgroundColor: saveState === 'saved' ? '#4caf50' : saveState === 'error' ? '#f44336' : '#2e7d32',
                       color: 'white',
                       border: 'none',
                       borderRadius: '4px',
-                      cursor: deleting ? 'not-allowed' : 'pointer',
-                      opacity: deleting ? 0.5 : 1
+                      cursor: (deleting || saveState === 'saving') ? 'not-allowed' : 'pointer',
+                      opacity: (deleting || saveState === 'saving') ? 0.5 : 1,
+                      minWidth: '120px'
                     }}
                   >
-                    Update Tags
+                    {saveState === 'saving' ? 'Saving...' : saveState === 'saved' ? 'Saved ✓' : saveState === 'error' ? 'Failed ✗' : 'Update Tags'}
                   </button>
                   {selectedPhoto.uploader_id === userInfo?.username && (
                     <button
@@ -1014,6 +1047,15 @@ export default function AlbumPage() {
           </div>
         )}
       </div>
+
+      {/* Toast Notifications */}
+      {toast && (
+        <Toast
+          type={toast.type}
+          message={toast.message}
+          onDismiss={() => setToast(null)}
+        />
+      )}
     </>
   );
 }
