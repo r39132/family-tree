@@ -52,14 +52,17 @@ def fake_album_db():
 @pytest.fixture
 def mock_storage(monkeypatch):
     """Mock GCS storage."""
+    upload_counter = {"count": 0}
 
     def mock_upload(file_content, content_type, space_id):
+        photo_id = f"test-photo-id-{upload_counter['count']}"
+        upload_counter['count'] += 1
         return (
-            "test-photo-id",
-            "demo/originals/test-photo-id.jpg",
-            "demo/thumbnails/test-photo-id_thumb.jpg",
-            "https://cdn.example.com/test-photo-id.jpg",
-            "https://cdn.example.com/test-photo-id_thumb.jpg",
+            photo_id,
+            f"demo/originals/{photo_id}.jpg",
+            f"demo/thumbnails/{photo_id}_thumb.jpg",
+            f"https://cdn.example.com/{photo_id}.jpg",
+            f"https://cdn.example.com/{photo_id}_thumb.jpg",
             800,
             600,
         )
@@ -124,10 +127,11 @@ def test_list_photos_pagination(fake_album_db, authenticated_client, mock_storag
             # Upload 15 photos
             for i in range(15):
                 img_bytes = create_test_image()
-                authenticated_client.post(
+                upload_response = authenticated_client.post(
                     "/spaces/demo/album/photos",
                     files={"file": (f"test{i}.jpg", img_bytes, "image/jpeg")},
                 )
+                assert upload_response.status_code == 200, f"Upload {i} failed: {upload_response.json()}"
 
             # Test first page with limit=10
             response = authenticated_client.get("/spaces/demo/album/photos?limit=10&offset=0")
