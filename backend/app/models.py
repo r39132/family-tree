@@ -461,3 +461,17 @@ class BulkPhotoDeleteResponse(BaseModel):
     failed: int
     deleted_ids: List[str]
     errors: List[dict]
+
+
+class TagInfo(BaseModel):
+    """Model for tag information with usage count"""
+
+    tag: str
+    count: int
+
+
+class TagsResponse(BaseModel):
+    """Response model for tags listing"""
+
+    tags: List[TagInfo]
+    total_tags: int
