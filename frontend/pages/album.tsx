@@ -17,6 +17,12 @@ type AlbumPhoto = {
   height: number;
   tags: string[];
   like_count: number;
+  // EXIF metadata fields
+  photo_date?: string;
+  camera_make?: string;
+  camera_model?: string;
+  gps_latitude?: number;
+  gps_longitude?: number;
 };
 
 type AlbumStats = {
@@ -685,7 +691,8 @@ export default function AlbumPage() {
             onChange={(e) => setSortBy(e.target.value)}
             style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
           >
-            <option value="upload_date">Upload Date</option>
+            <option value="upload_date">📤 Upload Date</option>
+            <option value="photo_date">📷 Photo Date (EXIF)</option>
             <option value="likes">Likes</option>
             <option value="filename">Filename</option>
             <option value="uploader">Uploader</option>
@@ -940,27 +947,51 @@ export default function AlbumPage() {
               <div style={{ padding: '15px', borderTop: '1px solid #eee' }}>
                 <div style={{
                   display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
+                  flexDirection: 'column',
+                  gap: '8px',
                   marginBottom: '10px'
                 }}>
-                  <span style={{ fontSize: '14px', color: '#666' }}>
-                    Uploaded by {selectedPhoto.uploader_id} on {new Date(selectedPhoto.upload_date).toLocaleDateString()}
-                  </span>
-                  <button
-                    onClick={() => toggleLike(selectedPhoto.id)}
-                    style={{
-                      padding: '8px 16px',
-                      backgroundColor: likedPhotos.has(selectedPhoto.id) ? '#e57373' : '#fff',
-                      color: likedPhotos.has(selectedPhoto.id) ? '#fff' : '#333',
-                      border: '1px solid #ddd',
-                      borderRadius: '20px',
-                      cursor: 'pointer',
-                      fontSize: '14px'
-                    }}
-                  >
-                    ❤️ {selectedPhoto.like_count}
-                  </button>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontSize: '14px', color: '#666' }}>
+                        📤 Uploaded by {selectedPhoto.uploader_id} on {new Date(selectedPhoto.upload_date).toLocaleDateString()}
+                      </span>
+                      {selectedPhoto.photo_date && (
+                        <span style={{ fontSize: '14px', color: '#2e7d32', fontWeight: '500' }}>
+                          📷 Photo taken: {new Date(selectedPhoto.photo_date).toLocaleString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      )}
+                      {(selectedPhoto.camera_make || selectedPhoto.camera_model) && (
+                        <span style={{ fontSize: '13px', color: '#888' }}>
+                          📸 {selectedPhoto.camera_make} {selectedPhoto.camera_model}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => toggleLike(selectedPhoto.id)}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: likedPhotos.has(selectedPhoto.id) ? '#e57373' : '#fff',
+                        color: likedPhotos.has(selectedPhoto.id) ? '#fff' : '#333',
+                        border: '1px solid #ddd',
+                        borderRadius: '20px',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                      }}
+                    >
+                      ❤️ {selectedPhoto.like_count}
+                    </button>
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
