@@ -11,6 +11,7 @@ from google.cloud import storage
 from PIL import Image
 
 from app.config import settings
+from app.utils.exif import extract_exif_metadata
 
 
 def get_album_storage_client() -> Optional[storage.Client]:
@@ -51,7 +52,7 @@ def generate_thumbnail(image: Image.Image, size: int = 300) -> bytes:
 
 def upload_album_photo(
     file_content: bytes, content_type: str, space_id: str
-) -> Optional[Tuple[str, str, str, str, int, int, int]]:
+) -> Optional[Tuple[str, str, str, str, str, int, int, dict]]:
     """
     Upload an album photo to Google Cloud Storage.
 
@@ -61,7 +62,7 @@ def upload_album_photo(
         space_id: The family space ID
 
     Returns:
-        Tuple of (photo_id, gcs_path, thumbnail_path, cdn_url, thumbnail_cdn_url, width, height)
+        Tuple of (photo_id, gcs_path, thumbnail_path, cdn_url, thumbnail_cdn_url, width, height, exif_metadata)
         or None if upload failed
     """
     client = get_album_storage_client()
@@ -72,6 +73,9 @@ def upload_album_photo(
     try:
         image = Image.open(io.BytesIO(file_content))
         width, height = image.size
+
+        # Extract EXIF metadata before optimization
+        exif_metadata = extract_exif_metadata(image)
 
         # Optimize if too large (>2MB)
         if len(file_content) > 2 * 1024 * 1024:
@@ -124,7 +128,16 @@ def upload_album_photo(
                 method="GET",
             )
 
-        return (photo_id, original_path, thumbnail_path, cdn_url, thumbnail_cdn_url, width, height)
+        return (
+            photo_id,
+            original_path,
+            thumbnail_path,
+            cdn_url,
+            thumbnail_cdn_url,
+            width,
+            height,
+            exif_metadata,
+        )
 
     except Exception as e:
         print(f"Error uploading to GCS: {e}")
