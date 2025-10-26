@@ -690,12 +690,13 @@ export default function AlbumPage() {
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
             style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+            aria-label="Sort photos by"
           >
-            <option value="upload_date">📤 Upload Date</option>
-            <option value="photo_date">📷 Photo Date (EXIF)</option>
-            <option value="likes">Likes</option>
-            <option value="filename">Filename</option>
-            <option value="uploader">Uploader</option>
+            <option value="upload_date" aria-label="Sort by upload date">📤 Upload Date</option>
+            <option value="photo_date" aria-label="Sort by photo date from EXIF metadata">📷 Photo Date (EXIF)</option>
+            <option value="likes" aria-label="Sort by number of likes">Likes</option>
+            <option value="filename" aria-label="Sort by filename">Filename</option>
+            <option value="uploader" aria-label="Sort by uploader">Uploader</option>
           </select>
 
           <select
@@ -962,7 +963,7 @@ export default function AlbumPage() {
                       </span>
                       {selectedPhoto.photo_date && (
                         <span style={{ fontSize: '14px', color: '#2e7d32', fontWeight: '500' }}>
-                          📷 Photo taken: {new Date(selectedPhoto.photo_date).toLocaleString('en-US', {
+                          📷 Photo taken: {new Date(selectedPhoto.photo_date).toLocaleString(undefined, {
                             year: 'numeric',
                             month: 'long',
                             day: 'numeric',
@@ -973,7 +974,7 @@ export default function AlbumPage() {
                       )}
                       {(selectedPhoto.camera_make || selectedPhoto.camera_model) && (
                         <span style={{ fontSize: '13px', color: '#888' }}>
-                          📸 {selectedPhoto.camera_make} {selectedPhoto.camera_model}
+                          📸 {[selectedPhoto.camera_make, selectedPhoto.camera_model].filter(Boolean).join(' ')}
                         </span>
                       )}
                     </div>
