@@ -63,7 +63,7 @@ export default function AlbumPage() {
 
   // Toast notifications
   const [toast, setToast] = useState<{ type: ToastType; message: string } | null>(null);
-  
+
   // Tag save state
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
@@ -295,7 +295,11 @@ export default function AlbumPage() {
   function handleAddTags() {
     if (!selectedPhoto) return;
 
-    const tags = newTags.split(',').map(t => t.trim()).filter(t => t);
+    // Split by comma or space, then clean up each tag
+    const tags = newTags.split(/[,\s]+/)
+      .map(t => t.trim())
+      .filter(t => t)
+      .map(t => t.startsWith('#') ? t.substring(1) : t); // Strip leading '#' for consistency
     updateTags(selectedPhoto.id, tags);
   }
 
@@ -851,7 +855,11 @@ export default function AlbumPage() {
                       fontSize: '12px',
                       color: '#2e7d32'
                     }}>
-                      {photo.tags.slice(0, 3).map(tag => `#${tag}`).join(' ')}
+                      {photo.tags.slice(0, 3).map(tag => {
+                        // Strip any existing '#' and add it back for consistency
+                        const cleanTag = tag.startsWith('#') ? tag.substring(1) : tag;
+                        return `#${cleanTag}`;
+                      }).join(' ')}
                     </div>
                   )}
                 </div>
@@ -998,7 +1006,7 @@ export default function AlbumPage() {
                     type="text"
                     value={newTags}
                     onChange={(e) => setNewTags(e.target.value)}
-                    placeholder="Add tags (comma-separated)"
+                    placeholder="Add tags (space or comma-separated)"
                     disabled={saveState === 'saving'}
                     style={{
                       flex: 1,
