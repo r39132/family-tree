@@ -20,6 +20,57 @@ def get_album_storage_client() -> Optional[storage.Client]:
     return storage.Client()
 
 
+def extract_gps_coordinates(image: Image.Image) -> Tuple[Optional[float], Optional[float]]:
+    """
+    Extract GPS coordinates from image EXIF data.
+
+    Args:
+        image: PIL Image object
+
+    Returns:
+        Tuple of (latitude, longitude) or (None, None) if not available
+    """
+    try:
+        exif = image.getexif()
+        if not exif:
+            return None, None
+
+        # EXIF tags for GPS info
+        gps_info = exif.get(34853)  # GPSInfo tag
+        if not gps_info:
+            return None, None
+
+        # Helper function to convert GPS coordinates
+        def get_decimal_from_dms(dms, ref):
+            """Convert degrees, minutes, seconds to decimal degrees."""
+            degrees = float(dms[0])
+            minutes = float(dms[1]) / 60.0
+            seconds = float(dms[2]) / 3600.0
+            decimal = degrees + minutes + seconds
+            
+            if ref in ['S', 'W']:
+                decimal = -decimal
+            
+            return decimal
+
+        lat = None
+        lon = None
+
+        # Extract latitude
+        if 2 in gps_info and 1 in gps_info:  # GPSLatitude and GPSLatitudeRef
+            lat = get_decimal_from_dms(gps_info[2], gps_info[1])
+
+        # Extract longitude
+        if 4 in gps_info and 3 in gps_info:  # GPSLongitude and GPSLongitudeRef
+            lon = get_decimal_from_dms(gps_info[4], gps_info[3])
+
+        return lat, lon
+
+    except Exception as e:
+        print(f"Error extracting GPS coordinates: {e}")
+        return None, None
+
+
 def generate_thumbnail(image: Image.Image, size: int = 300) -> bytes:
     """
     Generate a thumbnail from an image.
@@ -51,7 +102,7 @@ def generate_thumbnail(image: Image.Image, size: int = 300) -> bytes:
 
 def upload_album_photo(
     file_content: bytes, content_type: str, space_id: str
-) -> Optional[Tuple[str, str, str, str, int, int, int]]:
+) -> Optional[Tuple[str, str, str, str, str, int, int, Optional[float], Optional[float]]]:
     """
     Upload an album photo to Google Cloud Storage.
 
@@ -61,7 +112,7 @@ def upload_album_photo(
         space_id: The family space ID
 
     Returns:
-        Tuple of (photo_id, gcs_path, thumbnail_path, cdn_url, thumbnail_cdn_url, width, height)
+        Tuple of (photo_id, gcs_path, thumbnail_path, cdn_url, thumbnail_cdn_url, width, height, gps_latitude, gps_longitude)
         or None if upload failed
     """
     client = get_album_storage_client()
@@ -72,6 +123,9 @@ def upload_album_photo(
     try:
         image = Image.open(io.BytesIO(file_content))
         width, height = image.size
+
+        # Extract GPS coordinates
+        gps_latitude, gps_longitude = extract_gps_coordinates(image)
 
         # Optimize if too large (>2MB)
         if len(file_content) > 2 * 1024 * 1024:
@@ -124,7 +178,7 @@ def upload_album_photo(
                 method="GET",
             )
 
-        return (photo_id, original_path, thumbnail_path, cdn_url, thumbnail_cdn_url, width, height)
+        return (photo_id, original_path, thumbnail_path, cdn_url, thumbnail_cdn_url, width, height, gps_latitude, gps_longitude)
 
     except Exception as e:
         print(f"Error uploading to GCS: {e}")

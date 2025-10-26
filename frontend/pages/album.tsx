@@ -3,6 +3,10 @@ import { useRouter } from 'next/router';
 import TopNav from '../components/TopNav';
 import { api } from '../lib/api';
 import LoadingOverlay from '../components/LoadingOverlay';
+import dynamic from 'next/dynamic';
+
+// Dynamically import MapView to avoid SSR issues
+const AlbumMapView = dynamic(() => import('../components/AlbumMapView'), { ssr: false });
 
 type AlbumPhoto = {
   id: string;
@@ -17,6 +21,8 @@ type AlbumPhoto = {
   height: number;
   tags: string[];
   like_count: number;
+  gps_latitude?: number;
+  gps_longitude?: number;
 };
 
 type AlbumStats = {
@@ -31,6 +37,8 @@ type UserInfo = {
   current_space?: string;
 };
 
+type ViewMode = 'thumbnail' | 'standard' | 'map';
+
 export default function AlbumPage() {
   const router = useRouter();
   const [photos, setPhotos] = useState<AlbumPhoto[]>([]);
@@ -43,6 +51,9 @@ export default function AlbumPage() {
   const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+
+  // View mode
+  const [viewMode, setViewMode] = useState<ViewMode>('thumbnail');
 
   // Selection mode
   const [selectionMode, setSelectionMode] = useState(false);
@@ -68,6 +79,11 @@ export default function AlbumPage() {
 
   useEffect(() => {
     if (userInfo?.current_space) {
+      // Load view preference from localStorage
+      const savedView = localStorage.getItem(`album_view_${userInfo.current_space}`);
+      if (savedView && ['thumbnail', 'standard', 'map'].includes(savedView)) {
+        setViewMode(savedView as ViewMode);
+      }
       loadPhotos();
       loadStats();
     }
@@ -375,6 +391,13 @@ export default function AlbumPage() {
     setFilterTags('');
   }
 
+  function changeViewMode(mode: ViewMode) {
+    setViewMode(mode);
+    if (userInfo?.current_space) {
+      localStorage.setItem(`album_view_${userInfo.current_space}`, mode);
+    }
+  }
+
   if (loading && photos.length === 0) {
     return (
       <>
@@ -680,6 +703,58 @@ export default function AlbumPage() {
           flexWrap: 'wrap',
           alignItems: 'center'
         }}>
+          {/* View Mode Toggle */}
+          <div style={{ display: 'flex', gap: '5px', marginRight: '10px' }}>
+            <button
+              onClick={() => changeViewMode('thumbnail')}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: viewMode === 'thumbnail' ? '#2e7d32' : '#f5f5f5',
+                color: viewMode === 'thumbnail' ? 'white' : '#333',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: viewMode === 'thumbnail' ? 'bold' : 'normal'
+              }}
+              title="Thumbnail View"
+            >
+              🔲 Thumbnail
+            </button>
+            <button
+              onClick={() => changeViewMode('standard')}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: viewMode === 'standard' ? '#2e7d32' : '#f5f5f5',
+                color: viewMode === 'standard' ? 'white' : '#333',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: viewMode === 'standard' ? 'bold' : 'normal'
+              }}
+              title="Standard View"
+            >
+              🖼️ Standard
+            </button>
+            <button
+              onClick={() => changeViewMode('map')}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: viewMode === 'map' ? '#2e7d32' : '#f5f5f5',
+                color: viewMode === 'map' ? 'white' : '#333',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: viewMode === 'map' ? 'bold' : 'normal'
+              }}
+              title="Map View"
+            >
+              🗺️ Map
+            </button>
+          </div>
+
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
@@ -740,7 +815,116 @@ export default function AlbumPage() {
           }}>
             {photos.length === 0 ? 'No photos yet. Upload some to get started!' : 'No photos match your filters.'}
           </div>
+        ) : viewMode === 'map' ? (
+          // Map View
+          <AlbumMapView photos={filteredPhotos} onPhotoClick={openLightbox} />
+        ) : viewMode === 'standard' ? (
+          // Standard View - Larger images
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
+            gap: '30px'
+          }}>
+            {filteredPhotos.map((photo, index) => (
+              <div
+                key={photo.id}
+                onClick={() => selectionMode ? togglePhotoSelection(photo.id) : openLightbox(photo, index)}
+                style={{
+                  cursor: 'pointer',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  backgroundColor: '#fff',
+                  position: 'relative',
+                  border: selectionMode && selectedPhotos.has(photo.id) ? '4px solid #1976d2' : 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!selectionMode) {
+                    e.currentTarget.style.transform = 'scale(1.02)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!selectionMode) {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                  }
+                }}
+              >
+                {selectionMode && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '10px',
+                      right: '10px',
+                      width: '30px',
+                      height: '30px',
+                      borderRadius: '50%',
+                      backgroundColor: selectedPhotos.has(photo.id) ? '#1976d2' : 'rgba(255,255,255,0.9)',
+                      border: selectedPhotos.has(photo.id) ? 'none' : '2px solid #ccc',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '18px',
+                      color: 'white',
+                      zIndex: 10
+                    }}
+                  >
+                    {selectedPhotos.has(photo.id) && '✓'}
+                  </div>
+                )}
+                <img
+                  src={photo.cdn_url}
+                  alt={photo.filename}
+                  style={{
+                    width: '100%',
+                    height: '400px',
+                    objectFit: 'cover'
+                  }}
+                />
+                <div style={{ padding: '15px' }}>
+                  <div style={{
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    marginBottom: '8px',
+                    color: '#333'
+                  }}>
+                    {photo.filename}
+                  </div>
+                  <div style={{
+                    fontSize: '14px',
+                    color: '#666',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '8px'
+                  }}>
+                    <span>By {photo.uploader_id}</span>
+                    <span>❤️ {photo.like_count}</span>
+                  </div>
+                  <div style={{
+                    fontSize: '12px',
+                    color: '#999',
+                    marginBottom: '8px'
+                  }}>
+                    {new Date(photo.upload_date).toLocaleDateString()} • {photo.width} × {photo.height}
+                  </div>
+                  {photo.tags.length > 0 && (
+                    <div style={{
+                      marginTop: '8px',
+                      fontSize: '12px',
+                      color: '#2e7d32'
+                    }}>
+                      {photo.tags.map(tag => `#${tag}`).join(' ')}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
+          // Thumbnail View (default)
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
