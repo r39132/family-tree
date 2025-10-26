@@ -33,8 +33,7 @@ export default function AlbumMapView({ photos, onPhotoClick }: AlbumMapViewProps
 
   useEffect(() => {
     setMounted(true);
-    // Load Leaflet CSS
-    // @ts-ignore - CSS import for side effects
+    // Load Leaflet CSS dynamically to avoid SSR issues
     import('leaflet/dist/leaflet.css');
     // Load Leaflet library for icon configuration
     import('leaflet').then((L) => {
