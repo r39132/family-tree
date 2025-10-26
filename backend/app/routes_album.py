@@ -78,7 +78,7 @@ async def upload_photo(
     if not upload_result:
         raise HTTPException(status_code=500, detail="Failed to upload photo")
 
-    photo_id, gcs_path, thumbnail_path, cdn_url, thumbnail_cdn_url, width, height = upload_result
+    photo_id, gcs_path, thumbnail_path, cdn_url, thumbnail_cdn_url, width, height, gps_latitude, gps_longitude = upload_result
 
     # Save to Firestore
     db = get_db()
@@ -98,6 +98,8 @@ async def upload_photo(
         "height": height,
         "mime_type": file.content_type,
         "tags": [],
+        "gps_latitude": gps_latitude,
+        "gps_longitude": gps_longitude,
         "created_at": now,
         "updated_at": now,
     }
@@ -106,6 +108,7 @@ async def upload_photo(
     photo_ref.set(photo_data)
 
     return AlbumPhoto(id=photo_id, like_count=0, **photo_data)
+
 
 
 @router.post("/{space_id}/album/photos/bulk", response_model=BulkPhotoUploadResponse)
@@ -178,6 +181,8 @@ async def bulk_upload_photos(
                 thumbnail_cdn_url,
                 width,
                 height,
+                gps_latitude,
+                gps_longitude,
             ) = upload_result
 
             # Save to Firestore
@@ -195,6 +200,8 @@ async def bulk_upload_photos(
                 "height": height,
                 "mime_type": file.content_type,
                 "tags": [],
+                "gps_latitude": gps_latitude,
+                "gps_longitude": gps_longitude,
                 "created_at": now,
                 "updated_at": now,
             }
@@ -222,6 +229,7 @@ def list_photos(
     current_user: str = Depends(get_current_username),
     uploader: Optional[str] = None,
     tags: Optional[str] = None,  # Comma-separated tags
+    has_location: Optional[bool] = None,  # Filter by GPS data
     sort_by: str = "upload_date",
     sort_order: str = "desc",
     limit: int = 50,
@@ -250,6 +258,17 @@ def list_photos(
             if not any(tag in photo_tags for tag in tag_list):
                 continue
 
+        # Filter by location if specified
+        if has_location is not None:
+            has_gps = (
+                photo_data.get("gps_latitude") is not None
+                and photo_data.get("gps_longitude") is not None
+            )
+            if has_location and not has_gps:
+                continue
+            if not has_location and has_gps:
+                continue
+
         # Count likes
         likes_query = db.collection("album_likes").where("photo_id", "==", doc.id)
         like_count = len(list(likes_query.stream()))
@@ -271,6 +290,8 @@ def list_photos(
                 height=photo_data.get("height", 0),
                 mime_type=photo_data.get("mime_type", ""),
                 tags=photo_data.get("tags", []),
+                gps_latitude=photo_data.get("gps_latitude"),
+                gps_longitude=photo_data.get("gps_longitude"),
                 created_at=photo_data.get("created_at", ""),
                 updated_at=photo_data.get("updated_at", ""),
             )

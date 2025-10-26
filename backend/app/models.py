@@ -400,6 +400,8 @@ class AlbumPhoto(BaseModel):
     mime_type: str
     tags: List[str] = Field(default_factory=list)
     like_count: int = 0
+    gps_latitude: Optional[float] = None
+    gps_longitude: Optional[float] = None
     created_at: str
     updated_at: str
 
