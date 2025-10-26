@@ -78,7 +78,9 @@ async def upload_photo(
     if not upload_result:
         raise HTTPException(status_code=500, detail="Failed to upload photo")
 
-    photo_id, gcs_path, thumbnail_path, cdn_url, thumbnail_cdn_url, width, height = upload_result
+    photo_id, gcs_path, thumbnail_path, cdn_url, thumbnail_cdn_url, width, height, exif_metadata = (
+        upload_result
+    )
 
     # Save to Firestore
     db = get_db()
@@ -100,6 +102,12 @@ async def upload_photo(
         "tags": [],
         "created_at": now,
         "updated_at": now,
+        # EXIF metadata
+        "photo_date": exif_metadata.get("photo_date"),
+        "camera_make": exif_metadata.get("camera_make"),
+        "camera_model": exif_metadata.get("camera_model"),
+        "gps_latitude": exif_metadata.get("gps_latitude"),
+        "gps_longitude": exif_metadata.get("gps_longitude"),
     }
 
     photo_ref = db.collection("album_photos").document(photo_id)
@@ -178,6 +186,7 @@ async def bulk_upload_photos(
                 thumbnail_cdn_url,
                 width,
                 height,
+                exif_metadata,
             ) = upload_result
 
             # Save to Firestore
@@ -197,6 +206,12 @@ async def bulk_upload_photos(
                 "tags": [],
                 "created_at": now,
                 "updated_at": now,
+                # EXIF metadata
+                "photo_date": exif_metadata.get("photo_date"),
+                "camera_make": exif_metadata.get("camera_make"),
+                "camera_model": exif_metadata.get("camera_model"),
+                "gps_latitude": exif_metadata.get("gps_latitude"),
+                "gps_longitude": exif_metadata.get("gps_longitude"),
             }
 
             photo_ref = db.collection("album_photos").document(photo_id)
@@ -273,6 +288,12 @@ def list_photos(
                 tags=photo_data.get("tags", []),
                 created_at=photo_data.get("created_at", ""),
                 updated_at=photo_data.get("updated_at", ""),
+                # EXIF metadata fields
+                photo_date=photo_data.get("photo_date"),
+                camera_make=photo_data.get("camera_make"),
+                camera_model=photo_data.get("camera_model"),
+                gps_latitude=photo_data.get("gps_latitude"),
+                gps_longitude=photo_data.get("gps_longitude"),
             )
         )
 
@@ -280,6 +301,9 @@ def list_photos(
     reverse = sort_order == "desc"
     if sort_by == "upload_date":
         photos.sort(key=lambda p: p.upload_date, reverse=reverse)
+    elif sort_by == "photo_date":
+        # Sort by photo_date, fallback to upload_date if photo_date is None
+        photos.sort(key=lambda p: p.photo_date or p.upload_date, reverse=reverse)
     elif sort_by == "likes":
         photos.sort(key=lambda p: p.like_count, reverse=reverse)
     elif sort_by == "filename":

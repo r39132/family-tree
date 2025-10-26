@@ -1,5 +1,6 @@
 pyproject.toml
 app/__init__.py
+app/album.py
 app/auth_utils.py
 app/config.py
 app/deps.py
@@ -7,6 +8,7 @@ app/firestore_client.py
 app/main.py
 app/models.py
 app/routes_admin.py
+app/routes_album.py
 app/routes_auth.py
 app/routes_events.py
 app/routes_spaces.py
@@ -23,6 +25,7 @@ family_tree_api.egg-info/top_level.txt
 tests/test_additional_coverage.py
 tests/test_admin.py
 tests/test_admin_routes_coverage.py
+tests/test_album.py
 tests/test_auth_additional_coverage.py
 tests/test_auth_routes_coverage.py
 tests/test_auth_utils.py

@@ -62,6 +62,13 @@ def mock_storage(monkeypatch):
             "https://cdn.example.com/test-photo-id_thumb.jpg",
             800,
             600,
+            {  # EXIF metadata
+                "photo_date": None,
+                "camera_make": None,
+                "camera_model": None,
+                "gps_latitude": None,
+                "gps_longitude": None,
+            },
         )
 
     def mock_delete(gcs_path, thumbnail_path):

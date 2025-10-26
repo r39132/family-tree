@@ -402,6 +402,12 @@ class AlbumPhoto(BaseModel):
     like_count: int = 0
     created_at: str
     updated_at: str
+    # EXIF metadata fields
+    photo_date: Optional[str] = None  # From EXIF DateTimeOriginal
+    camera_make: Optional[str] = None  # From EXIF Make
+    camera_model: Optional[str] = None  # From EXIF Model
+    gps_latitude: Optional[float] = None  # From EXIF GPSInfo
+    gps_longitude: Optional[float] = None  # From EXIF GPSInfo
 
 
 class AlbumPhotoUpload(BaseModel):
