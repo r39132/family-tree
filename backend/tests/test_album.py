@@ -56,7 +56,7 @@ def mock_storage(monkeypatch):
 
     def mock_upload(file_content, content_type, space_id):
         photo_id = f"test-photo-id-{upload_counter['count']}"
-        upload_counter['count'] += 1
+        upload_counter["count"] += 1
         return (
             photo_id,
             f"demo/originals/{photo_id}.jpg",
@@ -131,7 +131,9 @@ def test_list_photos_pagination(fake_album_db, authenticated_client, mock_storag
                     "/spaces/demo/album/photos",
                     files={"file": (f"test{i}.jpg", img_bytes, "image/jpeg")},
                 )
-                assert upload_response.status_code == 200, f"Upload {i} failed: {upload_response.json()}"
+                assert (
+                    upload_response.status_code == 200
+                ), f"Upload {i} failed: {upload_response.json()}"
 
             # Test first page with limit=10
             response = authenticated_client.get("/spaces/demo/album/photos?limit=10&offset=0")
