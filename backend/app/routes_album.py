@@ -4,7 +4,7 @@ Album routes for family space photo albums.
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 from .album import delete_album_photo, upload_album_photo
 from .config import settings
@@ -17,6 +17,8 @@ from .models import (
     BulkPhotoDeleteRequest,
     BulkPhotoDeleteResponse,
     BulkPhotoUploadResponse,
+    TagInfo,
+    TagsResponse,
 )
 from .routes_spaces import get_user_space
 from .utils.time import to_iso_string, utc_now
@@ -221,12 +223,23 @@ def list_photos(
     space_id: str,
     current_user: str = Depends(get_current_username),
     uploader: Optional[str] = None,
-    tags: Optional[str] = None,  # Comma-separated tags
+    tags: Optional[List[str]] = Query(None),  # List of tags to filter by
+    tag_match_mode: str = "any",  # "any" or "all"
     sort_by: str = "upload_date",
     sort_order: str = "desc",
     limit: int = 50,
 ):
-    """List photos in the album with filtering and sorting."""
+    """List photos in the album with filtering and sorting.
+    
+    Args:
+        space_id: The family space ID
+        uploader: Optional uploader username filter
+        tags: Optional list of tags to filter by
+        tag_match_mode: "any" (OR) or "all" (AND) for tag filtering
+        sort_by: Sort field
+        sort_order: "asc" or "desc"
+        limit: Maximum number of photos to return
+    """
     # Check space access
     if not check_space_access(current_user, space_id):
         raise HTTPException(status_code=403, detail="Access denied to this space")
@@ -245,10 +258,17 @@ def list_photos(
 
         # Filter by tags if specified
         if tags:
-            tag_list = [t.strip() for t in tags.split(",")]
-            photo_tags = photo_data.get("tags", [])
-            if not any(tag in photo_tags for tag in tag_list):
-                continue
+            photo_tags = [t.lower() for t in photo_data.get("tags", [])]
+            search_tags = [t.lower() for t in tags]
+            
+            if tag_match_mode == "all":
+                # All tags must be present
+                if not all(tag in photo_tags for tag in search_tags):
+                    continue
+            else:
+                # At least one tag must be present (OR)
+                if not any(tag in photo_tags for tag in search_tags):
+                    continue
 
         # Count likes
         likes_query = db.collection("album_likes").where("photo_id", "==", doc.id)
@@ -605,4 +625,66 @@ def get_album_stats(
         total_likes=total_likes,
         total_uploaders=total_uploaders,
         recent_uploads=recent_uploads,
+    )
+
+
+@router.get("/{space_id}/album/tags", response_model=TagsResponse)
+def get_album_tags(
+    space_id: str,
+    current_user: str = Depends(get_current_username),
+    sort_by: str = "count",  # "count" or "alphabetical"
+    query: Optional[str] = None,  # Optional search query for partial match
+):
+    """Get all unique tags with photo counts.
+    
+    Args:
+        space_id: The family space ID
+        sort_by: Sort by "count" (most used first) or "alphabetical"
+        query: Optional search query for partial/fuzzy tag matching
+    
+    Returns:
+        TagsResponse with list of tags and their counts
+    """
+    # Check space access
+    if not check_space_access(current_user, space_id):
+        raise HTTPException(status_code=403, detail="Access denied to this space")
+
+    db = get_db()
+    
+    # Fetch all photos for this space
+    photos_query = db.collection("album_photos").where("space_id", "==", space_id)
+    photos = list(photos_query.stream())
+    
+    # Count tag usage
+    tag_counts = {}
+    for photo_doc in photos:
+        photo_data = photo_doc.to_dict()
+        tags = photo_data.get("tags", [])
+        for tag in tags:
+            tag_lower = tag.lower()
+            if tag_lower in tag_counts:
+                tag_counts[tag_lower] += 1
+            else:
+                tag_counts[tag_lower] = 1
+    
+    # Filter by query if provided (partial match)
+    if query:
+        query_lower = query.lower()
+        tag_counts = {
+            tag: count for tag, count in tag_counts.items()
+            if query_lower in tag
+        }
+    
+    # Convert to list of TagInfo objects
+    tag_list = [TagInfo(tag=tag, count=count) for tag, count in tag_counts.items()]
+    
+    # Sort
+    if sort_by == "alphabetical":
+        tag_list.sort(key=lambda t: t.tag)
+    else:  # sort by count (default)
+        tag_list.sort(key=lambda t: t.count, reverse=True)
+    
+    return TagsResponse(
+        tags=tag_list,
+        total_tags=len(tag_list)
     )

@@ -1,6 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import TopNav from '../components/TopNav';
+import TagSearch from '../components/TagSearch';
+import TagChips from '../components/TagChips';
+import PopularTags from '../components/PopularTags';
 import { api } from '../lib/api';
 import LoadingOverlay from '../components/LoadingOverlay';
 import Toast, { ToastType } from '../components/Toast';
@@ -51,7 +54,8 @@ export default function AlbumPage() {
 
   // Filters and sorting
   const [filterUploader, setFilterUploader] = useState('');
-  const [filterTags, setFilterTags] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [tagMatchMode, setTagMatchMode] = useState<'any' | 'all'>('any');
   const [sortBy, setSortBy] = useState('upload_date');
   const [sortOrder, setSortOrder] = useState('desc');
 
@@ -69,6 +73,18 @@ export default function AlbumPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Save recent searches to localStorage
+  useEffect(() => {
+    if (selectedTags.length > 0) {
+      const recentSearches = JSON.parse(localStorage.getItem('recentTagSearches') || '[]');
+      const newSearches = [
+        selectedTags,
+        ...recentSearches.filter((s: string[]) => JSON.stringify(s) !== JSON.stringify(selectedTags))
+      ].slice(0, 10);
+      localStorage.setItem('recentTagSearches', JSON.stringify(newSearches));
+    }
+  }, [selectedTags]);
+
   useEffect(() => {
     loadUserInfo();
   }, []);
@@ -78,11 +94,7 @@ export default function AlbumPage() {
       loadPhotos();
       loadStats();
     }
-  }, [userInfo, sortBy, sortOrder]);
-
-  useEffect(() => {
-    applyFilters();
-  }, [photos, filterUploader, filterTags]);
+  }, [userInfo, sortBy, sortOrder, selectedTags, tagMatchMode]);
 
   async function loadUserInfo() {
     try {
@@ -103,11 +115,18 @@ export default function AlbumPage() {
       const params = new URLSearchParams({
         sort_by: sortBy,
         sort_order: sortOrder,
-        limit: '100'
+        limit: '100',
+        tag_match_mode: tagMatchMode,
+      });
+
+      // Add tags as array parameters
+      selectedTags.forEach(tag => {
+        params.append('tags', tag);
       });
 
       const data = await api(`/spaces/${userInfo.current_space}/album/photos?${params}`);
       setPhotos(data);
+      setFilteredPhotos(data);
       setError(null);
     } catch (e: any) {
       setError(e.message || 'Failed to load photos');
@@ -125,23 +144,6 @@ export default function AlbumPage() {
     } catch (e: any) {
       console.error('Failed to load stats:', e);
     }
-  }
-
-  function applyFilters() {
-    let filtered = [...photos];
-
-    if (filterUploader) {
-      filtered = filtered.filter(p => p.uploader_id === filterUploader);
-    }
-
-    if (filterTags) {
-      const tagList = filterTags.split(',').map(t => t.trim().toLowerCase());
-      filtered = filtered.filter(p =>
-        p.tags.some(t => tagList.includes(t.toLowerCase()))
-      );
-    }
-
-    setFilteredPhotos(filtered);
   }
 
   async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -397,9 +399,19 @@ export default function AlbumPage() {
     setSelectedPhotos(new Set());
   }
 
-  function clearFilters() {
+  function clearAllFilters() {
+    setSelectedTags([]);
     setFilterUploader('');
-    setFilterTags('');
+  }
+
+  function removeTag(tag: string) {
+    setSelectedTags(tags => tags.filter(t => t !== tag));
+  }
+
+  function addTag(tag: string) {
+    if (!selectedTags.includes(tag)) {
+      setSelectedTags(tags => [...tags, tag]);
+    }
   }
 
   if (loading && photos.length === 0) {
@@ -706,6 +718,62 @@ export default function AlbumPage() {
           </div>
         )}
 
+        {/* Popular Tags */}
+        {userInfo?.current_space && (
+          <PopularTags
+            spaceId={userInfo.current_space}
+            apiBase={process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080'}
+            token={typeof window !== 'undefined' ? localStorage.getItem('token') || '' : ''}
+            onTagClick={addTag}
+            disabled={uploading || deleting}
+          />
+        )}
+
+        {/* Tag Search and Active Filters */}
+        <div style={{
+          display: 'flex',
+          gap: '10px',
+          marginBottom: '15px',
+          flexWrap: 'wrap',
+          alignItems: 'center'
+        }}>
+          {userInfo?.current_space && (
+            <TagSearch
+              spaceId={userInfo.current_space}
+              apiBase={process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080'}
+              token={typeof window !== 'undefined' ? localStorage.getItem('token') || '' : ''}
+              selectedTags={selectedTags}
+              onTagsChange={setSelectedTags}
+              disabled={uploading || deleting}
+            />
+          )}
+
+          {selectedTags.length > 1 && (
+            <select
+              value={tagMatchMode}
+              onChange={(e) => setTagMatchMode(e.target.value as 'any' | 'all')}
+              disabled={uploading || deleting}
+              style={{
+                padding: '8px',
+                borderRadius: '4px',
+                border: '1px solid #ccc',
+                fontSize: '14px',
+              }}
+            >
+              <option value="any">Match ANY tag</option>
+              <option value="all">Match ALL tags</option>
+            </select>
+          )}
+        </div>
+
+        {/* Active Tag Filters */}
+        <TagChips
+          tags={selectedTags}
+          onRemove={removeTag}
+          onClearAll={clearAllFilters}
+          disabled={uploading || deleting}
+        />
+
         {/* Filters and Sorting */}
         <div style={{
           display: 'flex',
@@ -733,35 +801,6 @@ export default function AlbumPage() {
             <option value="desc">Descending</option>
             <option value="asc">Ascending</option>
           </select>
-
-          <input
-            type="text"
-            placeholder="Filter by tags (comma-separated)"
-            value={filterTags}
-            onChange={(e) => setFilterTags(e.target.value)}
-            style={{
-              padding: '8px',
-              borderRadius: '4px',
-              border: '1px solid #ccc',
-              minWidth: '200px'
-            }}
-          />
-
-          {(filterUploader || filterTags) && (
-            <button
-              onClick={clearFilters}
-              style={{
-                padding: '8px 12px',
-                backgroundColor: '#666',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Clear Filters
-            </button>
-          )}
         </div>
 
         {/* Photo Grid */}
